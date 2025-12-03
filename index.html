@@ -1,0 +1,2195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeCite: Interactive Research Story | Jahidul Arafat</title>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Patrick+Hand&family=Kalam:wght@300;400;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/styles_additional.css">
+</head>
+<body>
+    <!-- Question Category Modal -->
+    <div id="questionModal" class="question-modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Questions</h3>
+                <button class="modal-close" onclick="closeQuestionModal()">✕</button>
+            </div>
+            <div class="modal-body" id="modalQuestions"></div>
+        </div>
+    </div>
+
+    <!-- Draggable Handwritten Notes Panel -->
+    <div id="handwrittenPanel" class="handwritten-panel left-panel hidden">
+        <div class="panel-header">
+            <span class="panel-icon">✏️</span>
+            <span class="panel-title">Live Notes</span>
+            <button class="panel-clear" onclick="clearNotes()" title="Clear">🗑️</button>
+        </div>
+        <div class="panel-content" id="notesContent"></div>
+    </div>
+
+    <!-- Draggable Key Insights Panel -->
+    <div id="insightsPanel" class="handwritten-panel right-panel hidden">
+        <div class="panel-header">
+            <span class="panel-icon">💡</span>
+            <span class="panel-title">Key Insights</span>
+        </div>
+        <div class="panel-content" id="insightsContent"></div>
+    </div>
+
+    <!-- Panel Controls -->
+    <div class="panel-controls">
+        <button class="control-btn" onclick="togglePanelSettings()">⚙️ Panels</button>
+        <div id="panelSettingsDropdown" class="settings-dropdown hidden">
+            <div class="dropdown-header"><span>📋 Panel Settings</span><button onclick="togglePanelSettings()" style="background:none;border:none;color:var(--text);cursor:pointer;font-size:1.1rem;">✕</button></div>
+            <div class="dropdown-content">
+                <div class="setting-row">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="globalNotesToggle" onchange="toggleGlobalNotes()"> 📝 Live Notes Panel</label>
+                    <span class="setting-status off" id="notesStatus">OFF</span>
+                </div>
+                <div class="setting-row">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="globalInsightsToggle" onchange="toggleGlobalInsights()"> 💡 Key Insights Panel</label>
+                    <span class="setting-status off" id="insightsStatus">OFF</span>
+                </div>
+                <div class="quick-actions">
+                    <button class="quick-btn enable-all" onclick="enableAllPanels()">✓ Enable All</button>
+                    <button class="quick-btn disable-all" onclick="disableAllPanels()">✕ Disable All</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Narration Indicator -->
+    <div id="narrationIndicator" class="narration-indicator">
+        <div class="indicator-content">
+            <span class="indicator-icon">🎙️</span>
+            <span class="indicator-label">Speaking:</span>
+            <span id="narratingSceneNum" class="indicator-scene">--</span>
+            <span id="narratingSceneTitle" class="indicator-title">Ready</span>
+            <button id="resyncBtn" class="resync-btn" onclick="resyncNarration()" title="Sync audio (R)">🔄</button>
+        </div>
+        <div id="syncWarning" class="sync-warning hidden">
+            ⚠️ Audio is from Scene <span id="syncSceneNum"></span> - <button class="sync-link" onclick="resyncNarration()">Click to resync</button>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
+    
+    <!-- Scene Navigation -->
+    <div class="scene-nav" id="sceneNav"></div>
+
+    <!-- Audio Controls -->
+    <div id="audioControls" class="audio-controls">
+        <button id="toggleNarration" class="audio-btn" onclick="toggleNarration()">🔊</button>
+        <select id="voiceSelector" class="voice-selector" onchange="selectVoice(this.value)"><option>Loading...</option></select>
+        <input type="range" id="speechRate" class="rate-slider" min="0.5" max="2" step="0.1" value="1" oninput="updateSpeechRate()">
+        <span style="font-size:0.8rem;color:var(--text-muted);"><span id="rateValue">1×</span></span>
+    </div>
+
+    <!-- FULLSCREEN SIMULATOR -->
+    <div id="simulatorFullscreen" class="simulator-fullscreen">
+        <button class="simulator-close" onclick="closeSimulator()">✕</button>
+        <div class="simulator-header-bar">
+            <div class="simulator-title">🔬 Search Space Reduction Simulator</div>
+            <div class="simulator-stats">
+                <div class="sim-stat"><div class="sim-stat-label">Corpus</div><div class="sim-stat-value">2.4M</div></div>
+                <div class="sim-stat"><div class="sim-stat-label">Stages</div><div class="sim-stat-value">4</div></div>
+                <div class="sim-stat"><div class="sim-stat-label">Final</div><div class="sim-stat-value" id="simFinalStat">8</div></div>
+            </div>
+        </div>
+        <div class="simulator-body">
+            <div class="sim-visualization">
+                <div class="space-svg-container">
+                    <svg class="space-svg" viewBox="0 0 600 450" id="simSvg">
+                        <defs>
+                            <radialGradient id="fullGrad" cx="50%" cy="50%" r="50%"><stop offset="0%" style="stop-color:rgba(244,67,54,0.1)"/><stop offset="100%" style="stop-color:rgba(244,67,54,0.4)"/></radialGradient>
+                            <radialGradient id="hybridGrad" cx="50%" cy="50%" r="50%"><stop offset="0%" style="stop-color:rgba(99,102,241,0.1)"/><stop offset="100%" style="stop-color:rgba(99,102,241,0.5)"/></radialGradient>
+                            <radialGradient id="graphGrad" cx="50%" cy="50%" r="50%"><stop offset="0%" style="stop-color:rgba(16,185,129,0.1)"/><stop offset="100%" style="stop-color:rgba(16,185,129,0.5)"/></radialGradient>
+                            <radialGradient id="rerankGrad" cx="50%" cy="50%" r="50%"><stop offset="0%" style="stop-color:rgba(245,158,11,0.1)"/><stop offset="100%" style="stop-color:rgba(245,158,11,0.5)"/></radialGradient>
+                            <radialGradient id="validGrad" cx="50%" cy="50%" r="50%"><stop offset="0%" style="stop-color:rgba(139,92,246,0.2)"/><stop offset="100%" style="stop-color:rgba(139,92,246,0.7)"/></radialGradient>
+                        </defs>
+                        <circle cx="300" cy="225" r="200" fill="url(#fullGrad)" stroke="rgba(244,67,54,0.6)" stroke-width="2"/>
+                        <text x="300" y="50" text-anchor="middle" fill="rgba(244,67,54,0.8)" font-size="14">2.4M chunks</text>
+                        <circle id="circHybrid" cx="300" cy="225" r="150" fill="url(#hybridGrad)" stroke="rgba(99,102,241,0.8)" stroke-width="2" style="opacity:0"/>
+                        <text id="labelHybrid" x="300" y="90" text-anchor="middle" fill="var(--primary-light)" font-size="12" style="opacity:0">360K (Hybrid -85%)</text>
+                        <circle id="circGraph" cx="300" cy="225" r="100" fill="url(#graphGrad)" stroke="rgba(16,185,129,0.8)" stroke-width="2" style="opacity:0"/>
+                        <text id="labelGraph" x="300" y="135" text-anchor="middle" fill="#6ee7b7" font-size="12" style="opacity:0">+31% Graph Expand</text>
+                        <circle id="circRerank" cx="300" cy="225" r="55" fill="url(#rerankGrad)" stroke="rgba(245,158,11,0.8)" stroke-width="2" style="opacity:0"/>
+                        <text id="labelRerank" x="300" y="180" text-anchor="middle" fill="#fcd34d" font-size="11" style="opacity:0">Top 100 Rerank</text>
+                        <circle id="circValid" cx="300" cy="225" r="25" fill="url(#validGrad)" stroke="rgba(139,92,246,1)" stroke-width="3" style="opacity:0"/>
+                        <text id="labelValid" x="300" y="270" text-anchor="middle" fill="#c4b5fd" font-size="13" font-weight="600" style="opacity:0">8 Optimal</text>
+                        <g id="resultArrow" style="opacity:0">
+                            <path d="M300,260 L300,350" stroke="#c4b5fd" stroke-width="2" stroke-dasharray="5,5"/>
+                            <polygon points="295,345 300,360 305,345" fill="#c4b5fd"/>
+                            <text x="300" y="380" text-anchor="middle" fill="#c4b5fd" font-size="12">92.4% Accuracy</text>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+            <div class="sim-controls-panel">
+                <div class="sim-step-display">
+                    <div class="sim-step-num" id="currentStepNum">0</div>
+                    <div class="sim-step-name" id="currentStepName">Ready</div>
+                    <div class="sim-step-desc" id="currentStepDesc">Click Play to start</div>
+                </div>
+                <div class="sim-metrics">
+                    <div class="sim-metric"><span class="metric-label">Space Size</span><span class="metric-value" id="metricSize">2.4M</span></div>
+                    <div class="sim-metric"><span class="metric-label">Reduction</span><span class="metric-value" id="metricReduction">0%</span></div>
+                    <div class="sim-metric"><span class="metric-label">Accuracy Gain</span><span class="metric-value" id="metricAccuracy">+0%</span></div>
+                    <div class="sim-metric"><span class="metric-label">Eliminated</span><span class="metric-value" id="metricEliminated">0</span></div>
+                </div>
+                <div class="sim-buttons">
+                    <button class="sim-btn play" id="simPlayBtn" onclick="playSimulation()">▶ Play</button>
+                    <button class="sim-btn" onclick="stepSimulation()">⏭ Step</button>
+                    <button class="sim-btn" onclick="resetSimulation()">↺ Reset</button>
+                </div>
+                <div class="sim-speed"><label>Speed:</label><input type="range" id="simSpeedSlider" min="0.5" max="3" step="0.5" value="1" oninput="updateSimSpeed()"><span id="simSpeedValue">1×</span></div>
+                <div class="sim-pipeline">
+                    <div class="pipe-stage active" id="pipe0">Start</div>
+                    <div class="pipe-stage" id="pipe1">Hybrid</div>
+                    <div class="pipe-stage" id="pipe2">Graph</div>
+                    <div class="pipe-stage" id="pipe3">Rerank</div>
+                    <div class="pipe-stage" id="pipe4">Pack</div>
+                </div>
+                <div class="sim-stats-grid">
+                    <div class="stat-box"><div class="stat-label">Valid Chunks</div><div class="stat-value" id="statValid">2,400,000</div></div>
+                    <div class="stat-box"><div class="stat-label">Eliminated</div><div class="stat-value" id="statEliminated">0</div></div>
+                    <div class="stat-box"><div class="stat-label">Est. Accuracy</div><div class="stat-value" id="statAccuracy">71.2%</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <main class="presentation">
+        <!-- SCENE 0: TITLE -->
+        <section class="scene active" data-scene="0" data-title="Title">
+            <div class="scene-content title-scene">
+                <div class="badge-row animate-in"><span class="badge research">🔬 Research Paper</span></div>
+                <h1 class="main-title animate-in delay-1">CodeCite</h1>
+                <p class="tagline animate-in delay-2">Citation-Grounded RAG for Verifiable Code Comprehension</p>
+                
+                <!-- Author Card - Matching Screenshot Design -->
+                <div class="author-card animate-in delay-3">
+                    <div class="author-avatar">JA</div>
+                    <div class="author-details">
+                        <div class="author-name-card">Jahidul Arafat</div>
+                        <div class="author-cred-row primary">
+                            <span class="cred-icon-sm">🎓</span>
+                            <span>NSF Presidential & Woltosz Graduate Research Fellow</span>
+                        </div>
+                        <div class="author-cred-row secondary">
+                            <span class="cred-icon-sm">🏛️</span>
+                            <span>Graduate Research Fellow, Auburn University</span>
+                        </div>
+                        <div class="author-cred-row former-row">
+                            <span class="former-badge oracle">Former Oracle</span>
+                            <span class="former-role">L3 Senior Solution & Cloud Architect (MLOps)</span>
+                        </div>
+                        <div class="author-cred-row former-row">
+                            <span class="former-badge bkash">Former bKash</span>
+                            <span class="former-role">L4 Principal System Analyst, Reliability Engineering</span>
+                        </div>
+                        <div class="author-sub-note">🦄 Unicorn • Alipay Co-owned • SoftBank Sponsored</div>
+                    </div>
+                </div>
+                
+                <div class="key-results animate-in delay-4">
+                    <div class="result-item"><span class="result-value">92%</span><span class="result-label">Citation Accuracy</span></div>
+                    <div class="result-item"><span class="result-value">0</span><span class="result-label">Hallucinations</span></div>
+                    <div class="result-item"><span class="result-value">500+</span><span class="result-label">Repos Tested</span></div>
+                    <div class="result-item"><span class="result-value">10</span><span class="result-label">LLMs Evaluated</span></div>
+                </div>
+                
+                <div class="source-code-link animate-in delay-4">
+                    <a href="https://github.com/jahidul-arafat/codecite" target="_blank" class="github-link">
+                        <span class="github-icon">📦</span> Source Code: github.com/jahidul-arafat/codecite
+                    </a>
+                </div>
+                
+                <button class="start-btn animate-in delay-5" onclick="nextScene()">Begin Presentation →</button>
+            </div>
+        </section>
+
+        <!-- SCENE 1: RESEARCH OVERVIEW -->
+        <section class="scene" data-scene="1" data-title="Research Overview">
+            <div class="scene-content">
+                <div class="chapter-badge overview">📋 Research Overview</div>
+                <h2 class="scene-title animate-in">Citation-Grounded Code Comprehension</h2>
+                <p class="scene-subtitle animate-in delay-1">Eliminating LLM hallucinations through verifiable source code citations</p>
+                <div class="abstract-box animate-in delay-2">
+                    <p>LLMs frequently <strong>hallucinate</strong> file paths, line numbers, and code snippets. CodeCite ensures every claim is <span class="term-highlight" data-term="citation">citation-grounded</span> in the format <code>[file.py:start-end]</code>, achieving <strong>92% accuracy</strong> with <strong>zero hallucinations</strong>.</p>
+                </div>
+                <div class="rq-cards animate-in delay-3">
+                    <div class="rq-card rq1" onclick="goToScene(12)"><div class="rq-num">RQ1</div><div class="rq-title">Retrieval Strategy</div><div class="rq-desc">Sparse vs Dense vs Hybrid + RM3 + Rerank</div><div class="rq-original">← RQ1, RQ5, RQ6</div></div>
+                    <div class="rq-card rq2" onclick="goToScene(14)"><div class="rq-num">RQ2</div><div class="rq-title">Context Selection</div><div class="rq-desc">Graph-RAG + Submodular Packing</div><div class="rq-original">← RQ2, RQ3</div></div>
+                    <div class="rq-card rq3" onclick="goToScene(16)"><div class="rq-num">RQ3</div><div class="rq-title">LLM Performance</div><div class="rq-desc">10 Model Comparison + Evaluation Suite</div><div class="rq-original">← RQ4, RQ7</div></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 2: RESEARCH NOVELTY -->
+        <section class="scene" data-scene="2" data-title="Research Novelty">
+            <div class="scene-content">
+                <div class="chapter-badge novelty">🌟 Research Novelty</div>
+                <h2 class="scene-title animate-in">Four Key Innovations</h2>
+                <p class="scene-subtitle animate-in delay-1">What makes CodeCite unique</p>
+                <div class="novelty-grid animate-in delay-2">
+                    <div class="novelty-card"><div class="novelty-icon">📍</div><div class="novelty-title">Citation-Grounded Generation</div><div class="novelty-desc">Every LLM claim must cite exact source code: <code>[file.py:start-end]</code></div></div>
+                    <div class="novelty-card"><div class="novelty-icon">🕸️</div><div class="novelty-title">Graph-Augmented RAG</div><div class="novelty-desc">Neo4j code graphs enable cross-file discovery (+31% coverage)</div></div>
+                    <div class="novelty-card"><div class="novelty-icon">📦</div><div class="novelty-title">Submodular Packing</div><div class="novelty-desc">Diversity-aware context selection (+15% over greedy)</div></div>
+                    <div class="novelty-card"><div class="novelty-icon">✅</div><div class="novelty-title">Automated Verification</div><div class="novelty-desc">Pipeline validates all citations → 0 hallucinations</div></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 3: KEY TERMINOLOGIES -->
+        <section class="scene" data-scene="3" data-title="Key Terminologies">
+            <div class="scene-content">
+                <div class="chapter-badge terminology">📚 Key Terminologies</div>
+                <h2 class="scene-title animate-in">Core Concepts & Definitions</h2>
+                <p class="scene-subtitle animate-in delay-1">Essential terms for understanding CodeCite</p>
+                
+                <div class="terminology-grid animate-in delay-2">
+                    <div class="term-card">
+                        <div class="term-header"><span class="term-icon">🔍</span><span class="term-name">RAG</span></div>
+                        <div class="term-full">Retrieval-Augmented Generation</div>
+                        <div class="term-def">Enhance LLM responses by retrieving relevant documents before generation</div>
+                    </div>
+                    <div class="term-card">
+                        <div class="term-header"><span class="term-icon">📊</span><span class="term-name">BM25</span></div>
+                        <div class="term-full">Best Matching 25</div>
+                        <div class="term-def">Probabilistic ranking function for lexical/keyword-based retrieval</div>
+                    </div>
+                    <div class="term-card">
+                        <div class="term-header"><span class="term-icon">🧠</span><span class="term-name">Dense Retrieval</span></div>
+                        <div class="term-full">Semantic Embedding Search</div>
+                        <div class="term-def">Uses neural embeddings (CodeBERT) for meaning-based similarity</div>
+                    </div>
+                    <div class="term-card">
+                        <div class="term-header"><span class="term-icon">⚖️</span><span class="term-name">Hybrid Retrieval</span></div>
+                        <div class="term-full">α·BM25 + β·Dense</div>
+                        <div class="term-def">Combines lexical and semantic scores with tunable weights</div>
+                    </div>
+                    <div class="term-card">
+                        <div class="term-header"><span class="term-icon">🔄</span><span class="term-name">RM3</span></div>
+                        <div class="term-full">Relevance Model 3</div>
+                        <div class="term-def">Query expansion using pseudo-relevance feedback from top results</div>
+                    </div>
+                    <div class="term-card">
+                        <div class="term-header"><span class="term-icon">🎯</span><span class="term-name">Cross-Encoder</span></div>
+                        <div class="term-full">Neural Reranking</div>
+                        <div class="term-def">Jointly scores query-document pairs for precise ranking</div>
+                    </div>
+                    <div class="term-card">
+                        <div class="term-header"><span class="term-icon">🕸️</span><span class="term-name">Graph-RAG</span></div>
+                        <div class="term-full">Graph-Augmented Retrieval</div>
+                        <div class="term-def">Uses code dependency graphs to discover related files</div>
+                    </div>
+                    <div class="term-card">
+                        <div class="term-header"><span class="term-icon">📈</span><span class="term-name">Submodular</span></div>
+                        <div class="term-full">Diminishing Returns Property</div>
+                        <div class="term-def">Optimization ensuring diversity: F(S∪{x}) - F(S) decreases as S grows</div>
+                    </div>
+                    <div class="term-card">
+                        <div class="term-header"><span class="term-icon">⚡</span><span class="term-name">FAISS</span></div>
+                        <div class="term-full">Facebook AI Similarity Search</div>
+                        <div class="term-def">Library for efficient billion-scale vector similarity search</div>
+                    </div>
+                    <div class="term-card">
+                        <div class="term-header"><span class="term-icon">🌳</span><span class="term-name">AST</span></div>
+                        <div class="term-full">Abstract Syntax Tree</div>
+                        <div class="term-def">Tree representation of code structure for parsing/chunking</div>
+                    </div>
+                    <div class="term-card">
+                        <div class="term-header"><span class="term-icon">📍</span><span class="term-name">Citation</span></div>
+                        <div class="term-full">[file.py:start-end]</div>
+                        <div class="term-def">Verifiable reference to exact source code location</div>
+                    </div>
+                    <div class="term-card">
+                        <div class="term-header"><span class="term-icon">👻</span><span class="term-name">Hallucination</span></div>
+                        <div class="term-full">Fabricated Information</div>
+                        <div class="term-def">LLM-generated content that doesn't exist in source code</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 4: WHAT IS CODECITE -->
+        <section class="scene" data-scene="4" data-title="What is CodeCite">
+            <div class="scene-content">
+                <div class="chapter-badge definition">💡 Definition</div>
+                <h2 class="scene-title animate-in">What is CodeCite?</h2>
+                <p class="scene-subtitle animate-in delay-1">Citation-Grounded Retrieval-Augmented Generation for Code</p>
+                
+                <div class="definition-box animate-in delay-2">
+                    <div class="def-equation">CodeCite = <span class="def-term citation">Citation</span> + <span class="def-term code">Code</span> + <span class="def-term rag">RAG</span></div>
+                    <p class="def-explain">Every LLM response must include verifiable source code references</p>
+                </div>
+
+                <div class="citation-format animate-in delay-3">
+                    <h4>Citation Format</h4>
+                    <code class="citation-example">[flask/app.py:829-862]</code>
+                    <div class="format-parts">
+                        <span class="format-part"><span class="part-label">File Path</span><span class="part-value">flask/app.py</span></span>
+                        <span class="format-part"><span class="part-label">Start Line</span><span class="part-value">829</span></span>
+                        <span class="format-part"><span class="part-label">End Line</span><span class="part-value">862</span></span>
+                    </div>
+                </div>
+
+                <div class="pipeline-mini animate-in delay-4">
+                    <div class="mini-stage">📝 Query</div>
+                    <div class="mini-arrow">→</div>
+                    <div class="mini-stage">🔀 Retrieve</div>
+                    <div class="mini-arrow">→</div>
+                    <div class="mini-stage">🕸️ Expand</div>
+                    <div class="mini-arrow">→</div>
+                    <div class="mini-stage">📦 Pack</div>
+                    <div class="mini-arrow">→</div>
+                    <div class="mini-stage">🤖 Generate</div>
+                    <div class="mini-arrow">→</div>
+                    <div class="mini-stage">✅ Verify</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 5: CORE CONCEPTS -->
+        <section class="scene" data-scene="5" data-title="Core Concepts">
+            <div class="scene-content">
+                <div class="chapter-badge concepts">🎓 Core Concepts</div>
+                <h2 class="scene-title animate-in">Retrieval Fundamentals</h2>
+                <p class="scene-subtitle animate-in delay-1">Understanding the building blocks</p>
+                
+                <div class="concepts-grid animate-in delay-2">
+                    <div class="concept-card bm25">
+                        <div class="concept-header"><span class="concept-icon">📊</span><span class="concept-name">BM25 (Sparse)</span></div>
+                        <div class="concept-desc">Lexical matching using term frequency and inverse document frequency</div>
+                        <div class="concept-formula">score = Σ IDF(t) · (TF · (k₁+1)) / (TF + k₁)</div>
+                        <div class="concept-strength">✓ Exact keyword matching</div>
+                    </div>
+                    <div class="concept-card dense">
+                        <div class="concept-header"><span class="concept-icon">🧠</span><span class="concept-name">Dense (CodeBERT)</span></div>
+                        <div class="concept-desc">Semantic similarity using 768-dimensional neural embeddings</div>
+                        <div class="concept-formula">score = cos(embed(q), embed(d))</div>
+                        <div class="concept-strength">✓ Meaning-based matching</div>
+                    </div>
+                    <div class="concept-card faiss">
+                        <div class="concept-header"><span class="concept-icon">⚡</span><span class="concept-name">FAISS Index</span></div>
+                        <div class="concept-desc">HNSW graph for millisecond-scale approximate nearest neighbor search</div>
+                        <div class="concept-formula">O(log n) query time</div>
+                        <div class="concept-strength">✓ Billion-scale vectors</div>
+                    </div>
+                    <div class="concept-card hybrid">
+                        <div class="concept-header"><span class="concept-icon">⚖️</span><span class="concept-name">Hybrid Fusion</span></div>
+                        <div class="concept-desc">Combines sparse and dense with tunable weights</div>
+                        <div class="concept-formula">S = α·BM25 + β·Dense</div>
+                        <div class="concept-strength optimal">✓ Optimal: α=0.3, β=0.7</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 6: ADVANCED RETRIEVAL -->
+        <section class="scene" data-scene="6" data-title="Advanced Retrieval">
+            <div class="scene-content">
+                <div class="chapter-badge advanced">🚀 Advanced Techniques</div>
+                <h2 class="scene-title animate-in">Query Expansion & Reranking</h2>
+                <p class="scene-subtitle animate-in delay-1">Boosting retrieval quality</p>
+                
+                <div class="advanced-grid animate-in delay-2">
+                    <div class="advanced-card rm3">
+                        <div class="advanced-header">
+                            <span class="advanced-icon">🔄</span>
+                            <span class="advanced-name">RM3 Query Expansion</span>
+                            <span class="advanced-gain">+18% Recall</span>
+                        </div>
+                        <div class="advanced-desc">
+                            <p>Pseudo-relevance feedback extracts expansion terms from top-10 initial results</p>
+                            <div class="advanced-example">
+                                <div class="example-label">Original:</div>
+                                <code>"Flask routing"</code>
+                                <div class="example-label">Expanded:</div>
+                                <code>"Flask routing dispatch url_rule endpoint"</code>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="advanced-card rerank">
+                        <div class="advanced-header">
+                            <span class="advanced-icon">🎯</span>
+                            <span class="advanced-name">Cross-Encoder Reranking</span>
+                            <span class="advanced-gain">+12% Precision</span>
+                        </div>
+                        <div class="advanced-desc">
+                            <p>Neural model scores query-document pairs jointly for precise ordering</p>
+                            <div class="advanced-tradeoff">
+                                <span class="tradeoff-item positive">↑ Precision +12%</span>
+                                <span class="tradeoff-item negative">↓ Latency 2×</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 7: THE PROBLEM -->
+        <section class="scene" data-scene="7" data-title="The Problem">
+            <div class="scene-content">
+                <div class="chapter-badge problem">⚠️ The Problem</div>
+                <h2 class="scene-title animate-in">LLMs Hallucinate Code References</h2>
+                <p class="scene-subtitle animate-in delay-1">Why verification matters</p>
+
+                <div class="problem-comparison animate-in delay-2">
+                    <div class="problem-card before">
+                        <div class="problem-header">❌ Without CodeCite</div>
+                        <div class="problem-content">
+                            <div class="problem-quote">"The routing is in <code>flask/routes.py:45-60</code>"</div>
+                            <div class="problem-result error">
+                                <span class="result-icon">🚫</span>
+                                <span class="result-text">File doesn't exist!</span>
+                            </div>
+                            <div class="problem-stats">
+                                <div class="stat-item"><span class="stat-value">30%</span><span class="stat-label">bugs from hallucinated code</span></div>
+                                <div class="stat-item"><span class="stat-value">45%</span><span class="stat-label">devs lost trust in AI</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="problem-card after">
+                        <div class="problem-header">✅ With CodeCite</div>
+                        <div class="problem-content">
+                            <div class="problem-quote">"The routing is in <code>[flask/app.py:829-862]</code>"</div>
+                            <div class="problem-result success">
+                                <span class="result-icon">✓</span>
+                                <span class="result-text">Verified: File exists, lines valid, content relevant</span>
+                            </div>
+                            <div class="problem-stats success">
+                                <div class="stat-item"><span class="stat-value">92.4%</span><span class="stat-label">citation accuracy</span></div>
+                                <div class="stat-item"><span class="stat-value">0</span><span class="stat-label">hallucinations</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 8: MATHEMATICAL FORMULATION -->
+        <section class="scene" data-scene="8" data-title="Math Formulation">
+            <div class="scene-content">
+                <div class="chapter-badge math">📐 Mathematical Formulation</div>
+                <h2 class="scene-title animate-in">Core Equations</h2>
+                <p class="scene-subtitle animate-in delay-1">The math behind CodeCite</p>
+                
+                <div class="math-grid animate-in delay-2">
+                    <div class="math-card">
+                        <div class="math-header">Hybrid Score Fusion</div>
+                        <div class="math-formula" id="math1"></div>
+                        <div class="math-params">α = 0.3 (sparse), β = 0.7 (dense)</div>
+                    </div>
+                    <div class="math-card">
+                        <div class="math-header">Graph-Augmented Scoring</div>
+                        <div class="math-formula" id="math2"></div>
+                        <div class="math-params">γ = 0.25 (bonus), decay = 0.6, h = hop distance</div>
+                    </div>
+                    <div class="math-card">
+                        <div class="math-header">Submodular Packing Objective</div>
+                        <div class="math-formula" id="math3"></div>
+                        <div class="math-params">λ = 0.4 (coverage), μ = 0.2 (redundancy penalty)</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 9: SEARCH SPACE REDUCTION -->
+        <section class="scene" data-scene="9" data-title="Search Space">
+            <div class="scene-content">
+                <div class="chapter-badge reduction">🎯 Search Space Reduction</div>
+                <h2 class="scene-title animate-in">From 2.4M to 8 Optimal Chunks</h2>
+                <p class="scene-subtitle animate-in delay-1">99.7% reduction while maximizing relevance</p>
+
+                <div class="reduction-visual animate-in delay-2">
+                    <div class="reduction-stage"><div class="stage-circle full">2.4M</div><div class="stage-label">Full Corpus</div></div>
+                    <div class="reduction-arrow">→<span class="arrow-label">-85%</span></div>
+                    <div class="reduction-stage"><div class="stage-circle hybrid">360K</div><div class="stage-label">Hybrid</div></div>
+                    <div class="reduction-arrow">→<span class="arrow-label">+31%</span></div>
+                    <div class="reduction-stage"><div class="stage-circle graph">470K</div><div class="stage-label">+Graph</div></div>
+                    <div class="reduction-arrow">→<span class="arrow-label">Top 100</span></div>
+                    <div class="reduction-stage"><div class="stage-circle rerank">100</div><div class="stage-label">Rerank</div></div>
+                    <div class="reduction-arrow">→<span class="arrow-label">Pack</span></div>
+                    <div class="reduction-stage"><div class="stage-circle final">8</div><div class="stage-label">Final</div></div>
+                </div>
+
+                <div class="simulator-trigger animate-in delay-3">
+                    <button class="simulator-btn large" onclick="openSimulator()">
+                        <span class="btn-icon">🔬</span>
+                        <span class="btn-text">Open Interactive Simulator</span>
+                        <span class="btn-hint">Visualize each reduction stage</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+        <!-- SCENE 10: ENHANCED NEO4J GRAPH - 24+ NODES -->
+        <section class="scene" data-scene="10" data-title="Neo4j Graph">
+            <div class="scene-content">
+                <div class="chapter-badge graph">🕸️ Graph-RAG Deep Dive</div>
+                <h2 class="scene-title animate-in">Code Dependency Graph (Neo4j)</h2>
+                <p class="scene-subtitle animate-in delay-1">24-node Flask repository graph with labeled edges</p>
+
+                <div class="graph-viz-container animate-in delay-2">
+                    <div class="graph-controls">
+                        <button class="graph-btn" onclick="animateGraphWalk()">▶ Animate 2-Hop Walk</button>
+                        <button class="graph-btn" onclick="resetGraph()">↺ Reset</button>
+                        <div class="graph-legend">
+                            <span class="legend-item seed">● Query Seed</span>
+                            <span class="legend-item hop0">● Hop 0</span>
+                            <span class="legend-item hop1">● Hop 1</span>
+                            <span class="legend-item hop2">● Hop 2</span>
+                        </div>
+                    </div>
+                    
+                    <svg class="graph-svg-large" id="graphSvgLarge" viewBox="0 0 1000 600">
+                        <defs>
+                            <linearGradient id="seedGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#10b981"/><stop offset="100%" style="stop-color:#14b8a6"/></linearGradient>
+                            <linearGradient id="hop0Grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#6366f1"/><stop offset="100%" style="stop-color:#8b5cf6"/></linearGradient>
+                            <linearGradient id="hop1Grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#f59e0b"/><stop offset="100%" style="stop-color:#d97706"/></linearGradient>
+                            <linearGradient id="hop2Grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#ec4899"/><stop offset="100%" style="stop-color:#be185d"/></linearGradient>
+                            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/></marker>
+                            <marker id="arrowActive" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#10b981"/></marker>
+                            <filter id="glowLarge"><feGaussianBlur stdDeviation="4" result="coloredBlur"/><feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                        </defs>
+                        
+                        <!-- EDGES WITH LABELS -->
+                        <g id="graphEdgesLarge" class="graph-edges">
+                            <!-- Seed to Hop 0 -->
+                            <g class="edge-group" data-edge="seed-app"><path class="graph-edge" d="M500,300 Q450,250 380,280"/><text class="edge-label" x="430" y="255">imports</text></g>
+                            <g class="edge-group" data-edge="seed-wrappers"><path class="graph-edge" d="M500,300 Q550,250 620,280"/><text class="edge-label" x="570" y="255">imports</text></g>
+                            <g class="edge-group" data-edge="seed-blueprints"><path class="graph-edge" d="M500,300 Q500,220 500,180"/><text class="edge-label" x="515" y="235">extends</text></g>
+                            
+                            <!-- Hop 0 to Hop 1 -->
+                            <g class="edge-group" data-edge="app-ctx"><path class="graph-edge" d="M380,280 Q320,320 280,380"/><text class="edge-label" x="310" y="340">creates</text></g>
+                            <g class="edge-group" data-edge="app-helpers"><path class="graph-edge" d="M380,280 Q340,350 320,420"/><text class="edge-label" x="335" y="365">uses</text></g>
+                            <g class="edge-group" data-edge="app-config"><path class="graph-edge" d="M380,280 Q300,240 220,220"/><text class="edge-label" x="280" y="245">loads</text></g>
+                            <g class="edge-group" data-edge="wrappers-request"><path class="graph-edge" d="M620,280 Q680,320 720,380"/><text class="edge-label" x="685" y="340">wraps</text></g>
+                            <g class="edge-group" data-edge="wrappers-response"><path class="graph-edge" d="M620,280 Q660,350 680,420"/><text class="edge-label" x="665" y="365">wraps</text></g>
+                            <g class="edge-group" data-edge="blueprints-app"><path class="graph-edge" d="M500,180 Q420,200 380,260"/><text class="edge-label" x="425" y="200">registers</text></g>
+                            <g class="edge-group" data-edge="blueprints-views"><path class="graph-edge" d="M500,180 Q550,130 620,120"/><text class="edge-label" x="565" y="140">contains</text></g>
+                            
+                            <!-- Hop 1 to Hop 2 -->
+                            <g class="edge-group" data-edge="ctx-globals"><path class="graph-edge" d="M280,380 Q200,380 140,350"/><text class="edge-label" x="195" y="355">manages</text></g>
+                            <g class="edge-group" data-edge="ctx-local"><path class="graph-edge" d="M280,380 Q220,430 180,480"/><text class="edge-label" x="215" y="440">stores</text></g>
+                            <g class="edge-group" data-edge="helpers-url"><path class="graph-edge" d="M320,420 Q280,470 240,520"/><text class="edge-label" x="265" y="480">builds</text></g>
+                            <g class="edge-group" data-edge="helpers-flash"><path class="graph-edge" d="M320,420 Q370,470 380,520"/><text class="edge-label" x="360" y="480">uses</text></g>
+                            <g class="edge-group" data-edge="request-session"><path class="graph-edge" d="M720,380 Q780,380 840,350"/><text class="edge-label" x="790" y="355">accesses</text></g>
+                            <g class="edge-group" data-edge="request-files"><path class="graph-edge" d="M720,380 Q780,430 820,480"/><text class="edge-label" x="785" y="440">handles</text></g>
+                            <g class="edge-group" data-edge="response-json"><path class="graph-edge" d="M680,420 Q720,470 760,520"/><text class="edge-label" x="735" y="480">renders</text></g>
+                            <g class="edge-group" data-edge="views-templates"><path class="graph-edge" d="M620,120 Q700,100 780,100"/><text class="edge-label" x="705" y="95">renders</text></g>
+                            <g class="edge-group" data-edge="views-static"><path class="graph-edge" d="M620,120 Q680,160 750,180"/><text class="edge-label" x="695" y="150">serves</text></g>
+                            <g class="edge-group" data-edge="config-env"><path class="graph-edge" d="M220,220 Q170,180 120,140"/><text class="edge-label" x="155" y="170">reads</text></g>
+                        </g>
+                        
+                        <!-- NODES - 24 total -->
+                        <g class="graph-nodes">
+                            <!-- Query Seed (1) -->
+                            <g class="graph-node seed-node" id="nodeSeed" transform="translate(500,300)">
+                                <circle r="40" fill="url(#seedGrad)" filter="url(#glowLarge)" class="node-circle"/>
+                                <text text-anchor="middle" y="-5" fill="white" font-size="11" font-weight="600">routing.py</text>
+                                <text text-anchor="middle" y="10" fill="white" font-size="9">(Query Seed)</text>
+                            </g>
+                            
+                            <!-- Hop 0 (3) -->
+                            <g class="graph-node hop0-node" id="nodeApp" transform="translate(380,280)"><circle r="32" fill="url(#hop0Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="10" font-weight="500">app.py</text></g>
+                            <g class="graph-node hop0-node" id="nodeWrappers" transform="translate(620,280)"><circle r="32" fill="url(#hop0Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="10" font-weight="500">wrappers.py</text></g>
+                            <g class="graph-node hop0-node" id="nodeBlueprints" transform="translate(500,180)"><circle r="32" fill="url(#hop0Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="10" font-weight="500">blueprints.py</text></g>
+                            
+                            <!-- Hop 1 (8) -->
+                            <g class="graph-node hop1-node" id="nodeCtx" transform="translate(280,380)"><circle r="26" fill="url(#hop1Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="9">ctx.py</text></g>
+                            <g class="graph-node hop1-node" id="nodeHelpers" transform="translate(320,420)"><circle r="26" fill="url(#hop1Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="9">helpers.py</text></g>
+                            <g class="graph-node hop1-node" id="nodeConfig" transform="translate(220,220)"><circle r="26" fill="url(#hop1Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="9">config.py</text></g>
+                            <g class="graph-node hop1-node" id="nodeRequest" transform="translate(720,380)"><circle r="26" fill="url(#hop1Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="9">request.py</text></g>
+                            <g class="graph-node hop1-node" id="nodeResponse" transform="translate(680,420)"><circle r="26" fill="url(#hop1Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="9">response.py</text></g>
+                            <g class="graph-node hop1-node" id="nodeViews" transform="translate(620,120)"><circle r="26" fill="url(#hop1Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="9">views.py</text></g>
+                            <g class="graph-node hop1-node" id="nodeSessions" transform="translate(400,140)"><circle r="22" fill="url(#hop1Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="8">sessions.py</text></g>
+                            <g class="graph-node hop1-node" id="nodeSignals" transform="translate(600,380)"><circle r="22" fill="url(#hop1Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="8">signals.py</text></g>
+                            
+                            <!-- Hop 2 (12) -->
+                            <g class="graph-node hop2-node" id="nodeGlobals" transform="translate(140,350)"><circle r="20" fill="url(#hop2Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="8">globals.py</text></g>
+                            <g class="graph-node hop2-node" id="nodeLocal" transform="translate(180,480)"><circle r="20" fill="url(#hop2Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="8">local.py</text></g>
+                            <g class="graph-node hop2-node" id="nodeUrl" transform="translate(240,520)"><circle r="20" fill="url(#hop2Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="8">url_for.py</text></g>
+                            <g class="graph-node hop2-node" id="nodeFlash" transform="translate(380,520)"><circle r="20" fill="url(#hop2Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="8">flash.py</text></g>
+                            <g class="graph-node hop2-node" id="nodeSession" transform="translate(840,350)"><circle r="20" fill="url(#hop2Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="8">session.py</text></g>
+                            <g class="graph-node hop2-node" id="nodeFiles" transform="translate(820,480)"><circle r="20" fill="url(#hop2Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="8">files.py</text></g>
+                            <g class="graph-node hop2-node" id="nodeJson" transform="translate(760,520)"><circle r="20" fill="url(#hop2Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="8">json.py</text></g>
+                            <g class="graph-node hop2-node" id="nodeTemplates" transform="translate(780,100)"><circle r="20" fill="url(#hop2Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="8">templates/</text></g>
+                            <g class="graph-node hop2-node" id="nodeStatic" transform="translate(750,180)"><circle r="20" fill="url(#hop2Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="8">static/</text></g>
+                            <g class="graph-node hop2-node" id="nodeEnv" transform="translate(120,140)"><circle r="20" fill="url(#hop2Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="8">.env</text></g>
+                            <g class="graph-node hop2-node" id="nodeLogging" transform="translate(100,420)"><circle r="18" fill="url(#hop2Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="7">logging.py</text></g>
+                            <g class="graph-node hop2-node" id="nodeCli" transform="translate(880,420)"><circle r="18" fill="url(#hop2Grad)"/><text text-anchor="middle" y="4" fill="white" font-size="7">cli.py</text></g>
+                        </g>
+                    </svg>
+                    
+                    <div class="graph-info-panel" id="graphInfoPanel">
+                        <div class="info-step" id="graphStep">Ready</div>
+                        <div class="info-desc" id="graphDesc">Click "Animate 2-Hop Walk" to see how graph expansion discovers related files</div>
+                        <div class="info-stats">
+                            <div class="info-stat"><span class="stat-num" id="nodesDiscovered">1</span><span class="stat-label">Nodes</span></div>
+                            <div class="info-stat"><span class="stat-num" id="edgesTraversed">0</span><span class="stat-label">Edges</span></div>
+                            <div class="info-stat"><span class="stat-num" id="coverageGain">0%</span><span class="stat-label">Coverage</span></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="graph-metrics animate-in delay-3">
+                    <div class="metric-card"><div class="metric-value">2</div><div class="metric-label">Max Hops</div></div>
+                    <div class="metric-card"><div class="metric-value">+31%</div><div class="metric-label">Coverage Gain</div></div>
+                    <div class="metric-card"><div class="metric-value">0.6</div><div class="metric-label">Decay Factor</div></div>
+                    <div class="metric-card"><div class="metric-value">24</div><div class="metric-label">Nodes Shown</div></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 11: ENHANCED 6-STAGE ARCHITECTURE -->
+        <section class="scene" data-scene="11" data-title="Full Pipeline">
+            <div class="scene-content">
+                <div class="chapter-badge technical">🏗️ Full Pipeline Architecture</div>
+                <h2 class="scene-title animate-in">6-Stage Processing Pipeline</h2>
+                <p class="scene-subtitle animate-in delay-1">Complete CodeCite architecture with performance metrics</p>
+
+                <div class="architecture-diagram animate-in delay-2">
+                    <div class="arch-row input-row">
+                        <div class="arch-stage input">
+                            <div class="stage-header">
+                                <span class="stage-num">1</span>
+                                <span class="stage-icon">📝</span>
+                            </div>
+                            <div class="stage-name">Query Input</div>
+                            <div class="stage-details">
+                                <div class="detail-item">Natural language query</div>
+                                <div class="detail-item">Intent extraction</div>
+                                <div class="detail-item">Keyword identification</div>
+                            </div>
+                            <div class="stage-example">"How does Flask handle routing?"</div>
+                        </div>
+                    </div>
+                    
+                    <div class="arch-connector">▼</div>
+                    
+                    <div class="arch-row processing-row">
+                        <div class="arch-stage process hybrid-stage">
+                            <div class="stage-header">
+                                <span class="stage-num">2</span>
+                                <span class="stage-icon">🔀</span>
+                            </div>
+                            <div class="stage-name">Hybrid Retrieval</div>
+                            <div class="stage-gain">+23%</div>
+                            <div class="stage-details">
+                                <div class="detail-item">BM25 lexical (α=0.3)</div>
+                                <div class="detail-item">CodeBERT dense (β=0.7)</div>
+                                <div class="detail-item">RM3 query expansion</div>
+                            </div>
+                            <div class="stage-output">→ 360K candidates</div>
+                        </div>
+                        
+                        <div class="arch-stage process graph-stage">
+                            <div class="stage-header">
+                                <span class="stage-num">3</span>
+                                <span class="stage-icon">🕸️</span>
+                            </div>
+                            <div class="stage-name">Graph Expansion</div>
+                            <div class="stage-gain">+31%</div>
+                            <div class="stage-details">
+                                <div class="detail-item">Neo4j 2-hop walks</div>
+                                <div class="detail-item">Decay factor 0.6</div>
+                                <div class="detail-item">Cross-file discovery</div>
+                            </div>
+                            <div class="stage-output">→ 470K with deps</div>
+                        </div>
+                        
+                        <div class="arch-stage process rerank-stage">
+                            <div class="stage-header">
+                                <span class="stage-num">4</span>
+                                <span class="stage-icon">🎯</span>
+                            </div>
+                            <div class="stage-name">Cross-Encoder Rerank</div>
+                            <div class="stage-gain">+12%</div>
+                            <div class="stage-details">
+                                <div class="detail-item">Neural scoring</div>
+                                <div class="detail-item">Joint query-doc</div>
+                                <div class="detail-item">Top-100 selection</div>
+                            </div>
+                            <div class="stage-output">→ 100 ranked</div>
+                        </div>
+                        
+                        <div class="arch-stage process pack-stage">
+                            <div class="stage-header">
+                                <span class="stage-num">5</span>
+                                <span class="stage-icon">📦</span>
+                            </div>
+                            <div class="stage-name">Submodular Pack</div>
+                            <div class="stage-gain">+15%</div>
+                            <div class="stage-details">
+                                <div class="detail-item">Diversity maximize</div>
+                                <div class="detail-item">Coverage optimize</div>
+                                <div class="detail-item">12K char budget</div>
+                            </div>
+                            <div class="stage-output">→ 8 optimal chunks</div>
+                        </div>
+                    </div>
+                    
+                    <div class="arch-connector">▼</div>
+                    
+                    <div class="arch-row output-row">
+                        <div class="arch-stage output">
+                            <div class="stage-header">
+                                <span class="stage-num">6</span>
+                                <span class="stage-icon">🤖</span>
+                            </div>
+                            <div class="stage-name">LLM Generation + Verification</div>
+                            <div class="stage-details">
+                                <div class="detail-item">Citation-grounded prompting</div>
+                                <div class="detail-item">Format: [file.py:start-end]</div>
+                                <div class="detail-item">Automated validation</div>
+                            </div>
+                            <div class="stage-final">
+                                <div class="final-metric"><span class="final-value">92.4%</span><span class="final-label">Citation Accuracy</span></div>
+                                <div class="final-metric"><span class="final-value">87.8%</span><span class="final-label">Verification Rate</span></div>
+                                <div class="final-metric"><span class="final-value">0</span><span class="final-label">Hallucinations</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="pipeline-summary animate-in delay-3">
+                    <div class="summary-item"><span class="sum-label">Total Improvement:</span><span class="sum-value">+81% over baseline</span></div>
+                    <div class="summary-item"><span class="sum-label">End-to-End Latency:</span><span class="sum-value">4.2 seconds</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 12: RQ1 METHODOLOGY -->
+        <section class="scene" data-scene="12" data-title="RQ1: Retrieval">
+            <div class="scene-content">
+                <div class="chapter-badge rq1">🔬 RQ1: Retrieval Strategy</div>
+                <h2 class="scene-title animate-in">What retrieval configuration maximizes citation accuracy?</h2>
+                <p class="scene-subtitle animate-in delay-1">Comparing Sparse vs Dense vs Hybrid with RM3 and Reranking<br><em style="color:var(--text-muted);font-size:0.9rem;">Covers original: RQ1, RQ5 (α/β sweeps), RQ6 (RM3 & Rerank)</em></p>
+
+                <div class="chart-box animate-in delay-2">
+                    <canvas id="rq1Chart" height="220"></canvas>
+                </div>
+
+                <div class="findings-grid animate-in delay-3">
+                    <div class="finding-card"><div class="finding-value">+23%</div><div class="finding-label">Hybrid over Sparse</div><div class="finding-detail">α=0.3, β=0.7 optimal</div></div>
+                    <div class="finding-card"><div class="finding-value">+18%</div><div class="finding-label">With RM3 Expansion</div><div class="finding-detail">Pseudo-relevance feedback</div></div>
+                    <div class="finding-card"><div class="finding-value">+12%</div><div class="finding-label">Cross-Encoder Rerank</div><div class="finding-detail">2× latency tradeoff</div></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 13: RQ1 COMMANDS -->
+        <section class="scene" data-scene="13" data-title="RQ1 Commands">
+            <div class="scene-content">
+                <div class="chapter-badge commands">💻 RQ1: Simulation Commands</div>
+                <h2 class="scene-title animate-in">Reproducing RQ1 Experiments</h2>
+                <p class="scene-subtitle animate-in delay-1">Both cc_cli.py and run_experiment.py commands</p>
+
+                <div class="cmd-grid animate-in delay-2">
+                    <div class="cmd-block"><div class="cmd-header">🔹 Sparse Retrieval (BM25 only)</div><pre class="cmd-code">python cc_cli.py ask --index fw_index.json --retrieval sparse \
+  --question "Where are HTTP method checks performed?" \
+  --base-url http://localhost:1234/v1 --model llama-3-groq-8b-tool-use</pre></div>
+                    
+                    <div class="cmd-block"><div class="cmd-header">🔹 Dense Retrieval (Embeddings)</div><pre class="cmd-code">python run_experiment.py --retrieval dense --faiss --rerank --qe none --graph \
+  --repos-file repos_500.txt --models-file models_lmstudio_10.txt \
+  --workdir work_dense --base-url http://localhost:1234/v1</pre></div>
+                    
+                    <div class="cmd-block"><div class="cmd-header optimal">⭐ Hybrid Retrieval (Optimal α=0.3, β=0.7)</div><pre class="cmd-code">python run_experiment.py --retrieval hybrid --faiss --rerank --qe rm3 --graph \
+  --repos-file repos_500.txt --models-file models_lmstudio_10.txt \
+  --per-repo-questions suites/flask_qas.jsonl \
+  --workdir work_hybrid --base-url http://localhost:1234/v1</pre></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 14: RQ2 WITH CATEGORY BREAKDOWN -->
+        <section class="scene" data-scene="14" data-title="RQ2: Context">
+            <div class="scene-content">
+                <div class="chapter-badge rq2">🔬 RQ2: Context Selection</div>
+                <h2 class="scene-title animate-in">How do graph expansion and packing impact quality?</h2>
+                <p class="scene-subtitle animate-in delay-1">Graph-RAG lift and Submodular vs Greedy packing by question category</p>
+
+                <div class="dual-chart-container animate-in delay-2">
+                    <div class="chart-panel">
+                        <h4>Overall Performance</h4>
+                        <canvas id="rq2Chart" height="180"></canvas>
+                    </div>
+                    <div class="chart-panel">
+                        <h4>Performance by Question Category</h4>
+                        <canvas id="rq2CategoryChart" height="180"></canvas>
+                    </div>
+                </div>
+
+                <div class="category-breakdown animate-in delay-3">
+                    <h4>Graph & Packing Impact by Category</h4>
+                    <div class="category-table">
+                        <div class="cat-row header">
+                            <span class="cat-name">Category</span>
+                            <span class="cat-metric">No Graph</span>
+                            <span class="cat-metric">+Graph</span>
+                            <span class="cat-metric">+Submod</span>
+                            <span class="cat-metric">Gain</span>
+                        </div>
+                        <div class="cat-row"><span class="cat-name">🔀 Routing</span><span class="cat-metric">78.3%</span><span class="cat-metric">89.2%</span><span class="cat-metric">94.1%</span><span class="cat-metric gain">+15.8%</span></div>
+                        <div class="cat-row"><span class="cat-name">🔐 Auth</span><span class="cat-metric">72.5%</span><span class="cat-metric">86.4%</span><span class="cat-metric">91.8%</span><span class="cat-metric gain">+19.3%</span></div>
+                        <div class="cat-row"><span class="cat-name">📦 Context</span><span class="cat-metric">68.9%</span><span class="cat-metric">88.7%</span><span class="cat-metric">93.2%</span><span class="cat-metric gain">+24.3%</span></div>
+                        <div class="cat-row"><span class="cat-name">🎨 Templates</span><span class="cat-metric">81.2%</span><span class="cat-metric">90.5%</span><span class="cat-metric">92.8%</span><span class="cat-metric gain">+11.6%</span></div>
+                        <div class="cat-row"><span class="cat-name">⚠️ Error</span><span class="cat-metric">75.6%</span><span class="cat-metric">87.3%</span><span class="cat-metric">91.4%</span><span class="cat-metric gain">+15.8%</span></div>
+                    </div>
+                </div>
+
+                <div class="findings-grid animate-in delay-4">
+                    <div class="finding-card"><div class="finding-value">+31%</div><div class="finding-label">Graph Coverage</div><div class="finding-detail">2-hop optimal</div></div>
+                    <div class="finding-card"><div class="finding-value">+15%</div><div class="finding-label">Submod over Greedy</div><div class="finding-detail">Diversity matters</div></div>
+                    <div class="finding-card"><div class="finding-value">+24.3%</div><div class="finding-label">Best: Context Category</div><div class="finding-detail">Cross-file benefits most</div></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 15: RQ2 COMMANDS -->
+        <section class="scene" data-scene="15" data-title="RQ2 Commands">
+            <div class="scene-content">
+                <div class="chapter-badge commands">💻 RQ2: Graph & Packing Commands</div>
+                <h2 class="scene-title animate-in">Reproducing RQ2 Experiments</h2>
+                <p class="scene-subtitle animate-in delay-1">Graph expansion and packer comparison</p>
+
+                <div class="cmd-grid animate-in delay-2">
+                    <div class="cmd-block"><div class="cmd-header">🔹 Without Graph Expansion</div><pre class="cmd-code">python run_experiment.py --retrieval hybrid --faiss --rerank --qe rm3 \
+  --repos-file repos_500.txt --models-file models_lmstudio_10.txt \
+  --workdir work_no_graph --base-url http://localhost:1234/v1</pre></div>
+                    
+                    <div class="cmd-block"><div class="cmd-header optimal">⭐ With Graph Expansion (2-hop)</div><pre class="cmd-code">python run_experiment.py --retrieval hybrid --faiss --rerank --qe rm3 --graph \
+  --graph-hops 2 --graph-decay 0.6 --graph-bonus 0.25 \
+  --repos-file repos_500.txt --models-file models_lmstudio_10.txt \
+  --workdir work_graph --base-url http://localhost:1234/v1</pre></div>
+                    
+                    <div class="cmd-block"><div class="cmd-header">🔹 Greedy vs Submodular Packing</div><pre class="cmd-code"># Greedy packing
+python run_experiment.py --retrieval hybrid --graph --packer greedy \
+  --max-context-chars 12000 --workdir work_greedy
+
+# Submodular packing (optimal)
+python run_experiment.py --retrieval hybrid --graph --packer submodular \
+  --max-context-chars 12000 --workdir work_submod</pre></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 16: RQ3 WITH CATEGORY BREAKDOWN -->
+        <section class="scene" data-scene="16" data-title="RQ3: LLM Performance">
+            <div class="scene-content">
+                <div class="chapter-badge llm">🤖 RQ3: LLM Performance</div>
+                <h2 class="scene-title animate-in">How do different LLMs perform on citation-grounded tasks?</h2>
+                <p class="scene-subtitle animate-in delay-1">10 LLMs compared across 5 question categories</p>
+
+                <div class="llm-chart-container animate-in delay-2">
+                    <canvas id="llmChart" height="200"></canvas>
+                </div>
+
+                <div class="llm-category-heatmap animate-in delay-3">
+                    <h4>LLM Performance by Question Category (%)</h4>
+                    <div class="heatmap-table">
+                        <div class="heatmap-row header">
+                            <span class="heatmap-cell model">Model</span>
+                            <span class="heatmap-cell">🔀 Routing</span>
+                            <span class="heatmap-cell">🔐 Auth</span>
+                            <span class="heatmap-cell">📦 Context</span>
+                            <span class="heatmap-cell">🎨 Templates</span>
+                            <span class="heatmap-cell">⚠️ Error</span>
+                            <span class="heatmap-cell avg">Avg</span>
+                        </div>
+                        <div class="heatmap-row best"><span class="heatmap-cell model">llama-3.1-8b</span><span class="heatmap-cell high">95.8</span><span class="heatmap-cell high">93.2</span><span class="heatmap-cell high">94.5</span><span class="heatmap-cell high">93.8</span><span class="heatmap-cell high">93.7</span><span class="heatmap-cell avg best">94.2</span></div>
+                        <div class="heatmap-row"><span class="heatmap-cell model">qwen2.5-7b</span><span class="heatmap-cell high">94.2</span><span class="heatmap-cell high">91.8</span><span class="heatmap-cell high">93.1</span><span class="heatmap-cell mid">92.5</span><span class="heatmap-cell high">92.4</span><span class="heatmap-cell avg">92.8</span></div>
+                        <div class="heatmap-row"><span class="heatmap-cell model">mistral-7b</span><span class="heatmap-cell high">93.1</span><span class="heatmap-cell mid">90.2</span><span class="heatmap-cell high">92.3</span><span class="heatmap-cell mid">91.4</span><span class="heatmap-cell mid">90.5</span><span class="heatmap-cell avg">91.5</span></div>
+                        <div class="heatmap-row"><span class="heatmap-cell model">gemma-2-9b</span><span class="heatmap-cell mid">91.5</span><span class="heatmap-cell mid">89.1</span><span class="heatmap-cell mid">90.8</span><span class="heatmap-cell mid">90.2</span><span class="heatmap-cell mid">89.9</span><span class="heatmap-cell avg">90.3</span></div>
+                        <div class="heatmap-row"><span class="heatmap-cell model">phi-3-medium</span><span class="heatmap-cell mid">90.8</span><span class="heatmap-cell mid">88.5</span><span class="heatmap-cell mid">90.1</span><span class="heatmap-cell mid">89.4</span><span class="heatmap-cell mid">89.7</span><span class="heatmap-cell avg">89.7</span></div>
+                    </div>
+                </div>
+
+                <div class="llm-insights animate-in delay-4">
+                    <div class="insight-item">✓ Instruction-tuned models achieve <strong>95%+</strong> format compliance</div>
+                    <div class="insight-item">✓ 8B models: <strong>85%</strong> quality at <strong>5×</strong> inference speed</div>
+                    <div class="insight-item">✓ Routing questions show highest accuracy across all models</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 17: RQ3 COMMANDS -->
+        <section class="scene" data-scene="17" data-title="RQ3 Commands">
+            <div class="scene-content">
+                <div class="chapter-badge commands">💻 RQ3: LLM Evaluation Commands</div>
+                <h2 class="scene-title animate-in">Reproducing RQ3 Experiments</h2>
+                <p class="scene-subtitle animate-in delay-1">Model comparison and per-category evaluation</p>
+
+                <div class="cmd-grid animate-in delay-2">
+                    <div class="cmd-block"><div class="cmd-header">🔹 10 LLM Model Comparison</div><pre class="cmd-code">python run_experiment.py --retrieval hybrid --faiss --rerank --qe rm3 --graph \
+  --repos-file repos_500.txt --models-file models_lmstudio_10.txt \
+  --per-repo-questions suites/flask_qas_90.jsonl \
+  --workdir work_models --base-url http://localhost:1234/v1</pre></div>
+                    
+                    <div class="cmd-block"><div class="cmd-header optimal">⭐ Per-Category Evaluation</div><pre class="cmd-code">python eval_plus.py --index fw_index.json --suite suites/flask_qas_90.jsonl \
+  --retrieval hybrid --use-faiss --faiss-dir fw_index_faiss \
+  --base-url http://localhost:1234/v1 --model llama-3-groq-8b-tool-use \
+  --out-csv results_by_category.csv --group-by category</pre></div>
+                    
+                    <div class="cmd-block"><div class="cmd-header">🔹 Single Model All Categories</div><pre class="cmd-code">for cat in routing auth context templates error; do
+  python eval_plus.py --index fw_index.json \
+    --suite suites/flask_${cat}_questions.jsonl \
+    --out-csv results_${cat}.csv
+done</pre></div>
+                </div>
+            </div>
+        </section>
+        <!-- SCENE 18: 90 QUESTION SUITE WITH CLICKABLE CATEGORIES -->
+        <section class="scene" data-scene="18" data-title="Question Suite">
+            <div class="scene-content">
+                <div class="chapter-badge questions">❓ Methodology: Question Suite</div>
+                <h2 class="scene-title animate-in">Evaluation Questions (90 Total)</h2>
+                <p class="scene-subtitle animate-in delay-1">Click any category to view all questions</p>
+
+                <div class="category-cards animate-in delay-2">
+                    <div class="category-card routing" onclick="showQuestionCategory('routing')">
+                        <div class="cat-icon">🔀</div>
+                        <div class="cat-title">Routing</div>
+                        <div class="cat-count">18 questions</div>
+                        <div class="cat-topics">URL rules, endpoints, redirects, methods</div>
+                        <div class="cat-click">Click to view all →</div>
+                    </div>
+                    <div class="category-card auth" onclick="showQuestionCategory('auth')">
+                        <div class="cat-icon">🔐</div>
+                        <div class="cat-title">Authentication</div>
+                        <div class="cat-count">16 questions</div>
+                        <div class="cat-topics">Sessions, cookies, login, security</div>
+                        <div class="cat-click">Click to view all →</div>
+                    </div>
+                    <div class="category-card context" onclick="showQuestionCategory('context')">
+                        <div class="cat-icon">📦</div>
+                        <div class="cat-title">Context</div>
+                        <div class="cat-count">20 questions</div>
+                        <div class="cat-topics">App context, request context, g object</div>
+                        <div class="cat-click">Click to view all →</div>
+                    </div>
+                    <div class="category-card templates" onclick="showQuestionCategory('templates')">
+                        <div class="cat-icon">🎨</div>
+                        <div class="cat-title">Templates</div>
+                        <div class="cat-count">16 questions</div>
+                        <div class="cat-topics">Jinja2, rendering, filters, macros</div>
+                        <div class="cat-click">Click to view all →</div>
+                    </div>
+                    <div class="category-card error" onclick="showQuestionCategory('error')">
+                        <div class="cat-icon">⚠️</div>
+                        <div class="cat-title">Error Handling</div>
+                        <div class="cat-count">20 questions</div>
+                        <div class="cat-topics">Exceptions, error handlers, abort, logging</div>
+                        <div class="cat-click">Click to view all →</div>
+                    </div>
+                </div>
+
+                <div class="sample-questions animate-in delay-3">
+                    <h4>Sample Questions (6 of 90)</h4>
+                    <div class="question-grid">
+                        <div class="question-card"><span class="question-id">rq-routing-1</span><div class="question-text">Where are HTTP method checks handled before routing?</div></div>
+                        <div class="question-card"><span class="question-id">rq-auth-5</span><div class="question-text">How does Flask validate session cookies?</div></div>
+                        <div class="question-card"><span class="question-id">rq-ctx-8</span><div class="question-text">Show the exact lines where app context is pushed.</div></div>
+                        <div class="question-card"><span class="question-id">rq-tmpl-3</span><div class="question-text">Where does Flask integrate with Jinja2 environment?</div></div>
+                        <div class="question-card"><span class="question-id">rq-err-12</span><div class="question-text">How are 404 errors converted to responses?</div></div>
+                        <div class="question-card"><span class="question-id">rq-routing-15</span><div class="question-text">Show blueprint URL prefix handling code.</div></div>
+                    </div>
+                </div>
+
+                <div class="question-format animate-in delay-4">
+                    <h4>Required Answer Format</h4>
+                    <div class="format-example">
+                        <code>Brief explanation (2-3 sentences), then: CITATION: [file.py:start-end]</code>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 19: HYPERPARAMETERS -->
+        <section class="scene" data-scene="19" data-title="Hyperparameters">
+            <div class="scene-content">
+                <div class="chapter-badge hyperparams">⚙️ Hyperparameter Tuning</div>
+                <h2 class="scene-title animate-in">Optimal Configuration Discovery</h2>
+                <p class="scene-subtitle animate-in delay-1">Grid search across 13 configurations</p>
+
+                <div class="hyperparam-section animate-in delay-2">
+                    <div class="hyperparam-grid">
+                        <div class="param-card optimal"><div class="param-name">α (sparse)</div><div class="param-value">0.3</div><div class="param-desc">Optimal</div></div>
+                        <div class="param-card optimal"><div class="param-name">β (dense)</div><div class="param-value">0.7</div><div class="param-desc">Optimal</div></div>
+                        <div class="param-card"><div class="param-name">k (candidates)</div><div class="param-value">28</div><div class="param-desc">Top-k</div></div>
+                        <div class="param-card"><div class="param-name">graph_hops</div><div class="param-value">2</div><div class="param-desc">Walk depth</div></div>
+                        <div class="param-card"><div class="param-name">graph_bonus</div><div class="param-value">0.25</div><div class="param-desc">Score boost</div></div>
+                        <div class="param-card"><div class="param-name">graph_decay</div><div class="param-value">0.6</div><div class="param-desc">Per-hop</div></div>
+                        <div class="param-card optimal"><div class="param-name">packer</div><div class="param-value">submod</div><div class="param-desc">Optimal</div></div>
+                        <div class="param-card"><div class="param-name">max_context</div><div class="param-value">12K</div><div class="param-desc">Chars</div></div>
+                        <div class="param-card"><div class="param-name">chunk_lines</div><div class="param-value">80</div><div class="param-desc">Per chunk</div></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 20: TECHNOLOGY STACK -->
+        <section class="scene" data-scene="20" data-title="Technology Stack">
+            <div class="scene-content">
+                <div class="chapter-badge tech">🛠️ Technology Stack</div>
+                <h2 class="scene-title animate-in">Implementation Details</h2>
+                <p class="scene-subtitle animate-in delay-1">Production-ready research infrastructure</p>
+
+                <div class="tech-stack-grid animate-in delay-2">
+                    <div class="stack-category">
+                        <h4>🔍 Retrieval & Search</h4>
+                        <div class="stack-items">
+                            <div class="stack-item"><span class="stack-name">FAISS</span><span class="stack-version">1.7+</span></div>
+                            <div class="stack-item"><span class="stack-name">rank_bm25</span><span class="stack-version">0.2+</span></div>
+                            <div class="stack-item"><span class="stack-name">sentence-transformers</span><span class="stack-version">2.2+</span></div>
+                        </div>
+                    </div>
+                    <div class="stack-category">
+                        <h4>🕸️ Graph & AST</h4>
+                        <div class="stack-items">
+                            <div class="stack-item"><span class="stack-name">Neo4j</span><span class="stack-version">5.0+</span></div>
+                            <div class="stack-item"><span class="stack-name">tree-sitter</span><span class="stack-version">0.20+</span></div>
+                            <div class="stack-item"><span class="stack-name">networkx</span><span class="stack-version">3.0+</span></div>
+                        </div>
+                    </div>
+                    <div class="stack-category">
+                        <h4>🤖 LLM Integration</h4>
+                        <div class="stack-items">
+                            <div class="stack-item"><span class="stack-name">LM Studio</span><span class="stack-version">0.2+</span></div>
+                            <div class="stack-item"><span class="stack-name">OpenAI API</span><span class="stack-version">1.0+</span></div>
+                            <div class="stack-item"><span class="stack-name">tiktoken</span><span class="stack-version">0.5+</span></div>
+                        </div>
+                    </div>
+                    <div class="stack-category">
+                        <h4>📊 Analysis</h4>
+                        <div class="stack-items">
+                            <div class="stack-item"><span class="stack-name">pandas</span><span class="stack-version">2.0+</span></div>
+                            <div class="stack-item"><span class="stack-name">matplotlib</span><span class="stack-version">3.7+</span></div>
+                            <div class="stack-item"><span class="stack-name">rich</span><span class="stack-version">13+</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 21: RESULTS SUMMARY -->
+        <section class="scene" data-scene="21" data-title="Results">
+            <div class="scene-content">
+                <div class="chapter-badge results">📊 Results Summary</div>
+                <h2 class="scene-title animate-in">Full Pipeline Performance</h2>
+                <p class="scene-subtitle animate-in delay-1">Comprehensive evaluation across 500+ repositories</p>
+
+                <div class="results-table animate-in delay-2">
+                    <table>
+                        <thead><tr><th>Metric</th><th>Value</th><th>Notes</th></tr></thead>
+                        <tbody>
+                            <tr><td>Citation Accuracy</td><td class="highlight">92.4%</td><td>Full pipeline</td></tr>
+                            <tr><td>Verification Rate</td><td class="highlight">87.8%</td><td>Automated validation</td></tr>
+                            <tr><td>Hallucinations</td><td class="highlight zero">0</td><td>Zero fabricated paths</td></tr>
+                            <tr><td>Cross-File Coverage</td><td>89.1%</td><td>Via 2-hop graph</td></tr>
+                            <tr><td>Average Latency</td><td>4.2s</td><td>End-to-end</td></tr>
+                            <tr><td>Repositories</td><td>500+</td><td>Diverse domains</td></tr>
+                            <tr><td>LLMs Evaluated</td><td>10</td><td>Via LM Studio</td></tr>
+                            <tr><td>Questions</td><td>90</td><td>5 categories</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 22: CLI REFERENCE -->
+        <section class="scene" data-scene="22" data-title="CLI Reference">
+            <div class="scene-content">
+                <div class="chapter-badge cli">📖 CLI Reference</div>
+                <h2 class="scene-title animate-in">Command Reference</h2>
+                <p class="scene-subtitle animate-in delay-1">cc_cli.py command summary</p>
+
+                <div class="cli-table animate-in delay-2">
+                    <div class="cli-row header"><span class="cli-cmd">Command</span><span class="cli-desc">Description</span></div>
+                    <div class="cli-row"><span class="cli-cmd">index</span><span class="cli-desc">Parse repository, extract chunks with AST</span></div>
+                    <div class="cli-row"><span class="cli-cmd">embed</span><span class="cli-desc">Generate CodeBERT embeddings for chunks</span></div>
+                    <div class="cli-row"><span class="cli-cmd">faiss-build</span><span class="cli-desc">Build FAISS HNSW index from embeddings</span></div>
+                    <div class="cli-row"><span class="cli-cmd">graph-load</span><span class="cli-desc">Import code dependencies into Neo4j</span></div>
+                    <div class="cli-row"><span class="cli-cmd">ask</span><span class="cli-desc">Query with full pipeline, get citations</span></div>
+                </div>
+            </div>
+        </section>
+        <!-- SCENE 23: INTERACTIVE DEMO WITH MULTIPLE QUESTIONS -->
+        <section class="scene" data-scene="23" data-title="Demo">
+            <div class="scene-content">
+                <div class="chapter-badge demo">🎮 Interactive Demo</div>
+                <h2 class="scene-title animate-in">Try CodeCite Live</h2>
+                <p class="scene-subtitle animate-in delay-1">Multiple query simulations with real output examples</p>
+
+                <div class="demo-multi-container animate-in delay-2">
+                    <div class="demo-controls">
+                        <button class="demo-tab active" onclick="selectDemoQuestion(0)">Q1: Routing ✓</button>
+                        <button class="demo-tab" onclick="selectDemoQuestion(1)">Q2: Redirect ✗</button>
+                        <button class="demo-tab" onclick="selectDemoQuestion(2)">Q3: Auth ✗</button>
+                        <button class="demo-tab" onclick="selectDemoQuestion(3)">Q4: Context ✓</button>
+                        <button class="demo-tab" onclick="selectDemoQuestion(4)">Q5: Error ✓</button>
+                    </div>
+                    
+                    <div class="demo-question-display">
+                        <div class="demo-q-header">
+                            <span class="demo-q-id" id="demoQId">rq-routing-1</span>
+                            <span class="demo-q-model">Model: llama-3-groq-8b-tool-use</span>
+                        </div>
+                        <div class="demo-q-text" id="demoQText">Where are HTTP method checks handled before routing?</div>
+                    </div>
+                    
+                    <div class="demo-terminal">
+                        <div class="terminal-header">
+                            <span class="terminal-dot red"></span>
+                            <span class="terminal-dot yellow"></span>
+                            <span class="terminal-dot green"></span>
+                            <span class="terminal-title">CodeCite Output</span>
+                            <button class="demo-run-btn" onclick="runDemoAnimation()">▶ Run Query</button>
+                        </div>
+                        <div class="terminal-body" id="demoTerminal">
+                            <p class="terminal-prompt">Click "Run Query" to simulate...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="demo-verification" id="demoVerification">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 24: ENHANCED EVALUATION SUITE WITH ANIMATED CHARTS -->
+        <section class="scene" data-scene="24" data-title="Eval Suite">
+            <div class="scene-content">
+                <div class="chapter-badge eval">📊 Evaluation Suite</div>
+                <h2 class="scene-title animate-in">Comprehensive Evaluation Results</h2>
+                <p class="scene-subtitle animate-in delay-1">90 questions × 3 variants × 10 LLMs = 2,700 evaluation runs</p>
+
+                <div class="eval-dashboard animate-in delay-2">
+                    <!-- Top Stats Row with Animated Counters -->
+                    <div class="eval-stats-row">
+                        <div class="eval-stat-card primary">
+                            <div class="stat-icon">📍</div>
+                            <div class="stat-value" id="evalCitationRate">92.4%</div>
+                            <div class="stat-label">Citation Accuracy</div>
+                            <div class="stat-target">Target: 90%+ ✓</div>
+                        </div>
+                        <div class="eval-stat-card success">
+                            <div class="stat-icon">✓</div>
+                            <div class="stat-value" id="evalVerifyRate">87.8%</div>
+                            <div class="stat-label">Verification Rate</div>
+                            <div class="stat-target">Target: 85%+ ✓</div>
+                        </div>
+                        <div class="eval-stat-card warning">
+                            <div class="stat-icon">⏱️</div>
+                            <div class="stat-value" id="evalLatency">4.2s</div>
+                            <div class="stat-label">Avg Latency</div>
+                            <div class="stat-target">Target: <5s ✓</div>
+                        </div>
+                        <div class="eval-stat-card danger">
+                            <div class="stat-icon">👻</div>
+                            <div class="stat-value zero" id="evalHallucinations">0</div>
+                            <div class="stat-label">Hallucinations</div>
+                            <div class="stat-target">Target: 0 ✓</div>
+                        </div>
+                    </div>
+
+                    <!-- Main Charts Grid -->
+                    <div class="eval-charts-grid">
+                        <!-- Variant Comparison Chart -->
+                        <div class="eval-chart-panel">
+                            <div class="chart-header">
+                                <h4>📈 Variant Performance Comparison</h4>
+                                <div class="chart-legend-inline">
+                                    <span class="legend-dot baseline"></span>Baseline
+                                    <span class="legend-dot submod"></span>+Submodular
+                                    <span class="legend-dot full"></span>Full Pipeline
+                                </div>
+                            </div>
+                            <canvas id="evalVariantChart" height="180"></canvas>
+                        </div>
+
+                        <!-- Category Performance Radar -->
+                        <div class="eval-chart-panel">
+                            <div class="chart-header">
+                                <h4>🎯 Per-Category Accuracy</h4>
+                                <select class="chart-select" id="categoryVariantSelect" onchange="updateEvalCategoryChart()">
+                                    <option value="full">Full Pipeline</option>
+                                    <option value="submod">+Submodular</option>
+                                    <option value="baseline">Baseline</option>
+                                </select>
+                            </div>
+                            <canvas id="evalCategoryRadar" height="180"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Animated Progress Panel -->
+                    <div class="eval-progress-panel">
+                        <div class="progress-header">
+                            <h4>🔬 Live Evaluation Simulation</h4>
+                            <button class="eval-run-btn" id="evalRunBtn" onclick="runEvalAnimation()">
+                                <span class="btn-icon">▶</span> Run Evaluation
+                            </button>
+                        </div>
+                        
+                        <div class="eval-progress-content">
+                            <div class="progress-categories">
+                                <div class="progress-category" id="prog-routing">
+                                    <span class="prog-icon">🔀</span>
+                                    <span class="prog-name">Routing</span>
+                                    <div class="prog-bar"><div class="prog-fill" id="progFill-routing"></div></div>
+                                    <span class="prog-score" id="progScore-routing">94.1%</span>
+                                </div>
+                                <div class="progress-category" id="prog-auth">
+                                    <span class="prog-icon">🔐</span>
+                                    <span class="prog-name">Auth</span>
+                                    <div class="prog-bar"><div class="prog-fill" id="progFill-auth"></div></div>
+                                    <span class="prog-score" id="progScore-auth">91.8%</span>
+                                </div>
+                                <div class="progress-category" id="prog-context">
+                                    <span class="prog-icon">📦</span>
+                                    <span class="prog-name">Context</span>
+                                    <div class="prog-bar"><div class="prog-fill" id="progFill-context"></div></div>
+                                    <span class="prog-score" id="progScore-context">93.2%</span>
+                                </div>
+                                <div class="progress-category" id="prog-templates">
+                                    <span class="prog-icon">🎨</span>
+                                    <span class="prog-name">Templates</span>
+                                    <div class="prog-bar"><div class="prog-fill" id="progFill-templates"></div></div>
+                                    <span class="prog-score" id="progScore-templates">92.8%</span>
+                                </div>
+                                <div class="progress-category" id="prog-error">
+                                    <span class="prog-icon">⚠️</span>
+                                    <span class="prog-name">Error</span>
+                                    <div class="prog-bar"><div class="prog-fill" id="progFill-error"></div></div>
+                                    <span class="prog-score" id="progScore-error">91.4%</span>
+                                </div>
+                            </div>
+                            
+                            <div class="progress-log" id="evalLog">
+                                <div class="log-entry ready">Ready to run evaluation suite simulation...</div>
+                                <div class="log-entry info">Click "Run Evaluation" to simulate the eval_plus.py execution</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Statistical Results Table -->
+                    <div class="eval-results-table">
+                        <div class="table-header">
+                            <h4>📋 Ablation Study Results</h4>
+                            <div class="table-actions">
+                                <span class="significance">* p < 0.05 vs baseline (paired t-test)</span>
+                            </div>
+                        </div>
+                        <table class="results-table">
+                            <thead>
+                                <tr>
+                                    <th>Variant</th>
+                                    <th>Citation %</th>
+                                    <th>Verify %</th>
+                                    <th>Coverage %</th>
+                                    <th>Latency</th>
+                                    <th>Δ vs Baseline</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="variant-badge baseline">Baseline (BM25)</span></td>
+                                    <td>71.2%</td>
+                                    <td>65.8%</td>
+                                    <td>58.2%</td>
+                                    <td>2.1s</td>
+                                    <td class="delta neutral">—</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="variant-badge hybrid">+Hybrid Retrieval</span></td>
+                                    <td>84.3%</td>
+                                    <td>79.6%</td>
+                                    <td>71.4%</td>
+                                    <td>2.8s</td>
+                                    <td class="delta positive">+13.1%*</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="variant-badge graph">+Graph Expansion</span></td>
+                                    <td>87.6%</td>
+                                    <td>82.9%</td>
+                                    <td>82.7%</td>
+                                    <td>3.2s</td>
+                                    <td class="delta positive">+16.4%*</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="variant-badge submod">+Submodular</span></td>
+                                    <td>89.1%</td>
+                                    <td>84.3%</td>
+                                    <td>85.9%</td>
+                                    <td>3.5s</td>
+                                    <td class="delta positive">+17.9%*</td>
+                                </tr>
+                                <tr class="best-row">
+                                    <td><span class="variant-badge full">Full Pipeline</span></td>
+                                    <td class="best">92.4%</td>
+                                    <td class="best">87.8%</td>
+                                    <td class="best">89.1%</td>
+                                    <td>4.2s</td>
+                                    <td class="delta positive best">+21.2%*</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Command Reference -->
+                    <div class="eval-command-ref">
+                        <div class="cmd-header">
+                            <span class="cmd-icon">💻</span>
+                            <span>Reproduce with eval_plus.py</span>
+                            <span class="cmd-badge">Full Suite: 90 Questions</span>
+                        </div>
+                        <pre class="eval-cmd">python eval_plus.py --index fw_index.json --suite suites/flask_qas_90.jsonl \
+  --retrieval hybrid --use-faiss --faiss-dir fw_index_faiss --use-dense --dense fw_dense.pkl \
+  --base-url http://localhost:1234/v1 --api-key lm-studio --model llama-3-groq-8b-tool-use \
+  --variants baseline,hybrid,graph,submodular,full --out-csv evaluation_results.csv \
+  --verify-citations strict --runs 3 --seed 42</pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 25: TROUBLESHOOTING -->
+        <section class="scene" data-scene="25" data-title="Troubleshooting">
+            <div class="scene-content">
+                <div class="chapter-badge trouble">🔧 Troubleshooting</div>
+                <h2 class="scene-title animate-in">Common Issues & Solutions</h2>
+                <p class="scene-subtitle animate-in delay-1">Quick fixes for typical problems</p>
+
+                <div class="trouble-grid animate-in delay-2">
+                    <div class="trouble-card">
+                        <div class="trouble-issue">❌ No citations in response</div>
+                        <div class="trouble-solution">Add <code>--verify-citations strict</code> flag</div>
+                    </div>
+                    <div class="trouble-card">
+                        <div class="trouble-issue">❌ Graph queries hang</div>
+                        <div class="trouble-solution">Set <code>--graph-timeout 3</code> seconds</div>
+                    </div>
+                    <div class="trouble-card">
+                        <div class="trouble-issue">❌ LLM timeout</div>
+                        <div class="trouble-solution">Increase <code>--llm-timeout 120</code> or reduce context</div>
+                    </div>
+                    <div class="trouble-card">
+                        <div class="trouble-issue">❌ Neo4j connection failed</div>
+                        <div class="trouble-solution">Run <code>neo4j start</code> or use <code>--no-graph</code></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 26: ANTICIPATED QUESTIONS / FAQ WITH TABS -->
+        <section class="scene" data-scene="26" data-title="FAQ">
+            <div class="scene-content faq-scene">
+                <div class="chapter-badge faq-badge">❓ ANTICIPATED QUESTIONS</div>
+                <h2 class="scene-title faq-title animate-in">FAQ for Reviewers</h2>
+                <p class="scene-subtitle animate-in delay-1">Addressing common technical questions from peer reviewers</p>
+
+                <div class="faq-tabs animate-in delay-2">
+                    <button class="faq-tab active" onclick="selectFaqTab('retrieval')">🔍 Retrieval</button>
+                    <button class="faq-tab" onclick="selectFaqTab('graph')">🕸️ Graph</button>
+                    <button class="faq-tab" onclick="selectFaqTab('packing')">📦 Packing</button>
+                    <button class="faq-tab" onclick="selectFaqTab('llm')">🤖 LLMs</button>
+                    <button class="faq-tab" onclick="selectFaqTab('verify')">✅ Verification</button>
+                    <button class="faq-tab" onclick="selectFaqTab('limits')">⚠️ Limitations</button>
+                </div>
+
+                <div class="faq-content" id="faqContent">
+                    <!-- Retrieval Tab (default) -->
+                    <div class="faq-panel active" id="faq-retrieval">
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q1</span>Why is α=0.3 the optimal sparse weight?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Key Finding:</strong> Code comprehension queries rely more on <em>semantic similarity</em> than exact keyword matching.</p>
+                                <ul>
+                                    <li><strong>α=0.3 (sparse):</strong> Captures exact function/variable names</li>
+                                    <li><strong>β=0.7 (dense):</strong> Understands conceptual queries like "how does routing work"</li>
+                                </ul>
+                                <div class="faq-highlight">Grid search across α∈{0.1, 0.3, 0.5, 0.7} showed 0.3 maximizes citation accuracy by +23% over sparse-only.</div>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q2</span>Why use BM25 + CodeBERT instead of just dense?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Complementary Strengths:</strong></p>
+                                <ul>
+                                    <li><strong>BM25:</strong> Exact matches for <code>dispatch_request</code>, <code>url_for</code></li>
+                                    <li><strong>CodeBERT:</strong> Semantic understanding of "error handling" → <code>handle_exception</code></li>
+                                </ul>
+                                <div class="faq-highlight">Hybrid achieves 84.3% accuracy vs 71.2% (sparse) and 76.5% (dense).</div>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q3</span>What is RM3 query expansion and why +18% recall?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Mechanism:</strong> Pseudo-relevance feedback extracts terms from top-10 initial results.</p>
+                                <div class="faq-example">
+                                    <div class="example-label">Original Query:</div>
+                                    <code>"Flask routing"</code>
+                                    <div class="example-label">Expanded:</div>
+                                    <code>"Flask routing dispatch url_rule endpoint redirect"</code>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q4</span>Cross-encoder reranking adds +12% but 2× latency—worth it?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Trade-off Analysis:</strong></p>
+                                <ul>
+                                    <li><strong>Pro:</strong> Joint query-document scoring improves precision significantly</li>
+                                    <li><strong>Con:</strong> 2× latency (2.8s → 3.8s average)</li>
+                                </ul>
+                                <div class="faq-highlight">Recommended for accuracy-critical applications; optional <code>--no-rerank</code> for speed.</div>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q5</span>How does FAISS HNSW enable fast dense search?</div>
+                            <div class="faq-a-new">
+                                <p><strong>HNSW (Hierarchical Navigable Small World):</strong> Graph-based approximate nearest neighbor.</p>
+                                <ul>
+                                    <li>O(log n) query time vs O(n) brute force</li>
+                                    <li>768-dim CodeBERT vectors indexed</li>
+                                    <li>Billion-scale capability</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Graph Tab -->
+                    <div class="faq-panel" id="faq-graph">
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q1</span>Why Neo4j instead of SQL for code graphs?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Complexity Comparison:</strong></p>
+                                <ul>
+                                    <li><strong>Neo4j:</strong> <code>MATCH (a)-[:IMPORTS*1..2]->(b)</code> — O(k) traversal</li>
+                                    <li><strong>SQL:</strong> Multiple self-joins — O(k×n) complexity</li>
+                                </ul>
+                                <div class="faq-highlight">Code dependency graphs are naturally hierarchical; graph DBs are 10-100× faster for hop queries.</div>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q2</span>Why 2 hops optimal? Why not 1 or 3?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Empirical Finding:</strong></p>
+                                <ul>
+                                    <li><strong>1-hop:</strong> Misses transitive dependencies (e.g., routing → app → config)</li>
+                                    <li><strong>2-hop:</strong> Sweet spot—captures cross-file context</li>
+                                    <li><strong>3-hop:</strong> Introduces noise, dilutes relevance</li>
+                                </ul>
+                                <div class="faq-highlight">2-hop: 89.1% coverage | 3-hop: 87.8% (noise penalty)</div>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q3</span>What is the decay factor (γ=0.6)?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Purpose:</strong> Attenuate score contribution as hop distance increases.</p>
+                                <div class="faq-formula">S_g(d) = S(q,d) + 0.25 × 0.6^h</div>
+                                <p>Hop 1 bonus: 0.15 | Hop 2 bonus: 0.09</p>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q4</span>Does CodeCite work without Neo4j?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Yes, with degradation:</strong></p>
+                                <ul>
+                                    <li>Use <code>--no-graph</code> flag</li>
+                                    <li>Cross-file coverage drops from 89.1% → 58.2%</li>
+                                    <li>Citation accuracy: 92.4% → 84.3%</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q5</span>What edges are captured in the code graph?</div>
+                            <div class="faq-a-new">
+                                <ul>
+                                    <li><strong>imports:</strong> Module dependencies</li>
+                                    <li><strong>calls:</strong> Function invocations</li>
+                                    <li><strong>extends:</strong> Class inheritance</li>
+                                    <li><strong>uses:</strong> Variable/attribute access</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Packing Tab -->
+                    <div class="faq-panel" id="faq-packing">
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q1</span>Why submodular packing beats greedy by +15%?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Key Difference:</strong></p>
+                                <ul>
+                                    <li><strong>Greedy:</strong> Selects top-k by score—often redundant chunks</li>
+                                    <li><strong>Submodular:</strong> Maximizes diversity: F(S) = Σrel + λ·cov - μ·red</li>
+                                </ul>
+                                <div class="faq-highlight">Submodular ensures coverage across different files/modules, not just highest-scoring duplicates.</div>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q2</span>What are λ and μ in the objective function?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Hyperparameters:</strong></p>
+                                <ul>
+                                    <li><strong>λ=0.4:</strong> Coverage bonus (distinct files/modules)</li>
+                                    <li><strong>μ=0.2:</strong> Redundancy penalty (pairwise similarity)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q3</span>Why 12K character budget?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Context Window Optimization:</strong></p>
+                                <ul>
+                                    <li>8B LLMs: ~4K-8K tokens effective context</li>
+                                    <li>12K chars ≈ 3K tokens + room for prompt + response</li>
+                                    <li>Larger budgets showed diminishing returns</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q4</span>How many chunks typically selected?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Typical Output:</strong> 6-10 chunks from 100 candidates</p>
+                                <p>Average chunk: 60-80 lines × ~20 chars/line = ~1.2-1.6K chars</p>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q5</span>What is the (1-1/e) approximation guarantee?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Theoretical Bound:</strong> Greedy forward selection for monotone submodular functions achieves at least 63% of optimal.</p>
+                                <div class="faq-highlight">Practical performance often exceeds this bound.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- LLM Tab -->
+                    <div class="faq-panel" id="faq-llm">
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q1</span>Why llama-3.1-8b best at 94.2%?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Factors:</strong></p>
+                                <ul>
+                                    <li>Strong instruction following</li>
+                                    <li>Trained on code + documentation</li>
+                                    <li>Excellent format compliance (96.1%)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q2</span>Can I use OpenAI/Claude instead?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Yes:</strong> Any OpenAI-compatible API works</p>
+                                <ul>
+                                    <li>LM Studio (local, private)</li>
+                                    <li>Ollama, vLLM</li>
+                                    <li>OpenAI API, Anthropic (cloud)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q3</span>Why 8B models achieve 85% of 70B quality?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Task-Specific:</strong> Citation generation is well-constrained</p>
+                                <ul>
+                                    <li>Format is simple: [file:start-end]</li>
+                                    <li>Context is pre-filtered and relevant</li>
+                                    <li>8B runs 5× faster locally</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q4</span>What prompt template ensures citations?</div>
+                            <div class="faq-a-new">
+                                <pre class="faq-code">You MUST cite exact source code locations.
+Format: [file.py:start-end]
+Only cite code from the provided context.
+If unsure, say "I cannot find evidence for this."</pre>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q5</span>What about code-specialized models?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Observation:</strong> Code models (CodeLlama) show +20% code understanding but lower format adherence.</p>
+                                <div class="faq-highlight">Instruction-tuned generalists perform better for structured citation tasks.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Verification Tab -->
+                    <div class="faq-panel" id="faq-verify">
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q1</span>How does citation verification work?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Three-Stage Check:</strong></p>
+                                <ul>
+                                    <li><strong>1. File exists:</strong> Path resolves in repository</li>
+                                    <li><strong>2. Lines valid:</strong> start ≤ end ≤ file_length</li>
+                                    <li><strong>3. Content relevant:</strong> Semantic similarity > threshold</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q2</span>What happens on verification failure?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Modes:</strong></p>
+                                <ul>
+                                    <li><code>--verify-citations strict</code>: Mark response as failed</li>
+                                    <li><code>--verify-citations warn</code>: Log warning, continue</li>
+                                    <li><code>--verify-citations none</code>: Skip verification</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q3</span>How is "0 hallucinations" achieved?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Constrained Generation:</strong></p>
+                                <ul>
+                                    <li>LLM can only cite from provided context</li>
+                                    <li>All paths verified against actual repository</li>
+                                    <li>Invalid citations = failed response (not counted)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q4</span>Why 87.8% verification vs 92.4% citation?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Gap Explained:</strong> Some citations are syntactically correct but semantically weak.</p>
+                                <ul>
+                                    <li>File exists ✓</li>
+                                    <li>Lines valid ✓</li>
+                                    <li>Content only marginally relevant ✗</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q5</span>Can citations span multiple files?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Yes:</strong> Multiple citations per response allowed</p>
+                                <code>[flask/app.py:100-120], [flask/helpers.py:50-60]</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Limitations Tab -->
+                    <div class="faq-panel" id="faq-limits">
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q1</span>What are the main limitations?</div>
+                            <div class="faq-a-new">
+                                <ul>
+                                    <li><strong>Indexing time:</strong> 5-15 min for large repos</li>
+                                    <li><strong>Neo4j dependency:</strong> Setup overhead</li>
+                                    <li><strong>Python only:</strong> Multi-language requires parsers</li>
+                                    <li><strong>Context budget:</strong> Very large repos may exceed 12K</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q2</span>Multi-language support planned?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Future Work:</strong></p>
+                                <ul>
+                                    <li>TypeScript (tree-sitter ready)</li>
+                                    <li>Java, C++ (in progress)</li>
+                                    <li>Language-specific CodeBERT variants</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q3</span>How to handle code evolution?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Current:</strong> Re-index on significant changes</p>
+                                <p><strong>Planned:</strong> Incremental indexing via git diff</p>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q4</span>Privacy for proprietary codebases?</div>
+                            <div class="faq-a-new">
+                                <p><strong>Fully Local:</strong></p>
+                                <ul>
+                                    <li>LM Studio runs entirely on-device</li>
+                                    <li>No data sent to external APIs</li>
+                                    <li>Neo4j local instance</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="faq-item-new" onclick="toggleFaqItem(this)">
+                            <div class="faq-q-new"><span class="faq-num">Q5</span>Open source availability?</div>
+                            <div class="faq-a-new">
+                                <p><strong>MIT License</strong> — Available on GitHub</p>
+                                <p>Includes: CLI tools, evaluation suite, sample configs</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Reference Bar -->
+                <div class="faq-quick-ref">
+                    <div class="quick-ref-title">📋 Quick Reference: Key Numbers</div>
+                    <div class="quick-ref-items">
+                        <div class="quick-ref-item"><span class="qr-value green">92.4%</span><span class="qr-label">Citation Accuracy</span></div>
+                        <div class="quick-ref-item"><span class="qr-value blue">87.8%</span><span class="qr-label">Verification Rate</span></div>
+                        <div class="quick-ref-item"><span class="qr-value purple">+23%</span><span class="qr-label">Hybrid Improvement</span></div>
+                        <div class="quick-ref-item"><span class="qr-value teal">+31%</span><span class="qr-label">Graph Coverage</span></div>
+                        <div class="quick-ref-item"><span class="qr-value orange">0</span><span class="qr-label">Hallucinations</span></div>
+                        <div class="quick-ref-item"><span class="qr-value pink">4.2s</span><span class="qr-label">Avg Latency</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 27: REVIEWER QUERY 1 - WHY 2-HOP -->
+        <section class="scene" data-scene="27" data-title="Reviewer Q1">
+            <div class="scene-content">
+                <div class="chapter-badge reviewer">🔬 Reviewer Query #1</div>
+                <h2 class="scene-title animate-in">Why 2-Hop? Why Not More?</h2>
+                <p class="scene-subtitle animate-in delay-1">Empirical justification for optimal graph traversal depth</p>
+
+                <div class="reviewer-content animate-in delay-2">
+                    <!-- The Question -->
+                    <div class="reviewer-question">
+                        <div class="question-icon">❓</div>
+                        <div class="question-text">
+                            "Why did you choose 2-hop graph expansion? What happens with 1-hop or 3+ hops?"
+                        </div>
+                    </div>
+
+                    <!-- Answer with Charts -->
+                    <div class="reviewer-answer">
+                        <div class="answer-section">
+                            <h4>📊 Empirical Comparison: Hop Depth vs Performance</h4>
+                            <div class="hop-comparison-grid">
+                                <!-- Chart -->
+                                <div class="hop-chart-container">
+                                    <canvas id="hopComparisonChart" height="220"></canvas>
+                                </div>
+                                
+                                <!-- Statistical Table -->
+                                <div class="hop-stats-table">
+                                    <table class="stats-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Hops</th>
+                                                <th>Citation %</th>
+                                                <th>Coverage %</th>
+                                                <th>Noise Ratio</th>
+                                                <th>Latency</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><span class="hop-badge h1">1-Hop</span></td>
+                                                <td>84.3%</td>
+                                                <td>67.2%</td>
+                                                <td class="good">12.1%</td>
+                                                <td>2.8s</td>
+                                            </tr>
+                                            <tr class="best-row">
+                                                <td><span class="hop-badge h2">2-Hop</span></td>
+                                                <td class="best">92.4%</td>
+                                                <td class="best">89.1%</td>
+                                                <td class="good">18.3%</td>
+                                                <td>4.2s</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="hop-badge h3">3-Hop</span></td>
+                                                <td>87.8%</td>
+                                                <td>91.2%</td>
+                                                <td class="bad">34.7%</td>
+                                                <td>6.1s</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="hop-badge h4">4-Hop</span></td>
+                                                <td>81.2%</td>
+                                                <td>92.8%</td>
+                                                <td class="bad">52.3%</td>
+                                                <td>9.4s</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Key Insights -->
+                        <div class="answer-section">
+                            <h4>🎯 Key Statistical Findings</h4>
+                            <div class="findings-grid">
+                                <div class="finding-card">
+                                    <div class="finding-icon">1️⃣</div>
+                                    <div class="finding-title">1-Hop: Insufficient Context</div>
+                                    <div class="finding-detail">
+                                        Misses transitive dependencies (e.g., <code>routing → app → config</code>)
+                                        <div class="finding-stat">Coverage: 67.2% <span class="delta negative">−21.9% vs 2-hop</span></div>
+                                    </div>
+                                </div>
+                                <div class="finding-card optimal">
+                                    <div class="finding-icon">2️⃣</div>
+                                    <div class="finding-title">2-Hop: Optimal Balance ✓</div>
+                                    <div class="finding-detail">
+                                        Captures cross-file dependencies with minimal noise
+                                        <div class="finding-stat">Best F1: <span class="highlight">0.907</span> (precision × coverage)</div>
+                                    </div>
+                                </div>
+                                <div class="finding-card">
+                                    <div class="finding-icon">3️⃣</div>
+                                    <div class="finding-title">3+ Hops: Noise Penalty</div>
+                                    <div class="finding-detail">
+                                        Exponential growth in irrelevant chunks dilutes context
+                                        <div class="finding-stat">Noise: 34.7%+ <span class="delta negative">−4.6% accuracy</span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mathematical Justification -->
+                        <div class="answer-section">
+                            <h4>📐 Theoretical Analysis</h4>
+                            <div class="math-box">
+                                <div class="math-formula">
+                                    <span class="formula-label">Graph Expansion Score:</span>
+                                    <span class="formula">S<sub>g</sub>(d) = S(q,d) + α × γ<sup>h</sup></span>
+                                </div>
+                                <div class="math-explanation">
+                                    <div class="param-row"><span class="param">α = 0.25</span> expansion bonus</div>
+                                    <div class="param-row"><span class="param">γ = 0.6</span> decay factor per hop</div>
+                                    <div class="param-row"><span class="param">h</span> = hop distance from query match</div>
+                                </div>
+                                <div class="decay-visualization">
+                                    <div class="decay-bar">
+                                        <div class="decay-segment h1" style="width: 60%">
+                                            <span>Hop 1: +0.15</span>
+                                        </div>
+                                        <div class="decay-segment h2" style="width: 30%">
+                                            <span>Hop 2: +0.09</span>
+                                        </div>
+                                        <div class="decay-segment h3" style="width: 10%">
+                                            <span>Hop 3: +0.05</span>
+                                        </div>
+                                    </div>
+                                    <div class="decay-note">Diminishing returns after 2 hops justify truncation</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Statistical Significance -->
+                        <div class="significance-box">
+                            <span class="sig-icon">📈</span>
+                            <span class="sig-text">Statistical Significance: 2-hop vs 1-hop: <strong>p < 0.001</strong> | 2-hop vs 3-hop: <strong>p = 0.023</strong> (paired t-test, n=90)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 28: REVIEWER QUERY 2 - VARIANT JUSTIFICATION -->
+        <section class="scene" data-scene="28" data-title="Reviewer Q2">
+            <div class="scene-content">
+                <div class="chapter-badge reviewer">🔬 Reviewer Query #2</div>
+                <h2 class="scene-title animate-in">Why These 3 Variants?</h2>
+                <p class="scene-subtitle animate-in delay-1">Justification for ablation study design choices</p>
+
+                <div class="reviewer-content animate-in delay-2">
+                    <!-- The Question -->
+                    <div class="reviewer-question">
+                        <div class="question-icon">❓</div>
+                        <div class="question-text">
+                            "How do you justify that the 3 variants (Baseline, +Submodular, Full) are appropriate for comparison?"
+                        </div>
+                    </div>
+
+                    <!-- Answer -->
+                    <div class="reviewer-answer">
+                        <!-- Ablation Study Design -->
+                        <div class="answer-section">
+                            <h4>🧪 Ablation Study Design Rationale</h4>
+                            <div class="variant-pipeline">
+                                <div class="pipeline-stage" id="var-baseline">
+                                    <div class="stage-header">
+                                        <span class="stage-num">1</span>
+                                        <span class="stage-name">Baseline (BM25)</span>
+                                    </div>
+                                    <div class="stage-desc">Standard sparse retrieval only</div>
+                                    <div class="stage-metric">71.2% citation</div>
+                                    <div class="stage-purpose">Establishes lower bound</div>
+                                </div>
+                                <div class="pipeline-arrow">→</div>
+                                <div class="pipeline-stage" id="var-hybrid">
+                                    <div class="stage-header">
+                                        <span class="stage-num">2</span>
+                                        <span class="stage-name">+Hybrid</span>
+                                    </div>
+                                    <div class="stage-desc">+ Dense retrieval (CodeBERT)</div>
+                                    <div class="stage-metric">84.3% <span class="delta-small">+13.1%</span></div>
+                                    <div class="stage-purpose">Tests semantic understanding</div>
+                                </div>
+                                <div class="pipeline-arrow">→</div>
+                                <div class="pipeline-stage" id="var-graph">
+                                    <div class="stage-header">
+                                        <span class="stage-num">3</span>
+                                        <span class="stage-name">+Graph</span>
+                                    </div>
+                                    <div class="stage-desc">+ Neo4j 2-hop expansion</div>
+                                    <div class="stage-metric">87.6% <span class="delta-small">+3.3%</span></div>
+                                    <div class="stage-purpose">Tests cross-file context</div>
+                                </div>
+                                <div class="pipeline-arrow">→</div>
+                                <div class="pipeline-stage" id="var-submod">
+                                    <div class="stage-header">
+                                        <span class="stage-num">4</span>
+                                        <span class="stage-name">+Submodular</span>
+                                    </div>
+                                    <div class="stage-desc">+ Diversity packing</div>
+                                    <div class="stage-metric">89.1% <span class="delta-small">+1.5%</span></div>
+                                    <div class="stage-purpose">Tests redundancy removal</div>
+                                </div>
+                                <div class="pipeline-arrow">→</div>
+                                <div class="pipeline-stage optimal" id="var-full">
+                                    <div class="stage-header">
+                                        <span class="stage-num">5</span>
+                                        <span class="stage-name">Full Pipeline</span>
+                                    </div>
+                                    <div class="stage-desc">+ Reranking + Verification</div>
+                                    <div class="stage-metric best">92.4% <span class="delta-small">+3.3%</span></div>
+                                    <div class="stage-purpose">Complete system</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Component Contribution Chart -->
+                        <div class="answer-section">
+                            <h4>📊 Component-wise Contribution Analysis</h4>
+                            <div class="contribution-grid">
+                                <div class="contribution-chart-container">
+                                    <canvas id="contributionChart" height="200"></canvas>
+                                </div>
+                                <div class="contribution-insights">
+                                    <div class="insight-item">
+                                        <span class="insight-component">Hybrid Retrieval</span>
+                                        <span class="insight-value">+13.1%</span>
+                                        <div class="insight-bar" style="width: 62%"></div>
+                                    </div>
+                                    <div class="insight-item">
+                                        <span class="insight-component">Graph Expansion</span>
+                                        <span class="insight-value">+3.3%</span>
+                                        <div class="insight-bar" style="width: 16%"></div>
+                                    </div>
+                                    <div class="insight-item">
+                                        <span class="insight-component">Submodular Packing</span>
+                                        <span class="insight-value">+1.5%</span>
+                                        <div class="insight-bar" style="width: 7%"></div>
+                                    </div>
+                                    <div class="insight-item">
+                                        <span class="insight-component">Reranking + Verify</span>
+                                        <span class="insight-value">+3.3%</span>
+                                        <div class="insight-bar" style="width: 16%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Why These Specific Variants -->
+                        <div class="answer-section">
+                            <h4>🎯 Selection Criteria for Variants</h4>
+                            <div class="criteria-grid">
+                                <div class="criteria-card">
+                                    <div class="criteria-header">
+                                        <span class="criteria-icon">🔬</span>
+                                        <span class="criteria-title">Isolate Each Contribution</span>
+                                    </div>
+                                    <div class="criteria-detail">
+                                        Each variant adds exactly ONE component, enabling precise measurement of individual contributions.
+                                    </div>
+                                </div>
+                                <div class="criteria-card">
+                                    <div class="criteria-header">
+                                        <span class="criteria-icon">📈</span>
+                                        <span class="criteria-title">Cumulative Improvement</span>
+                                    </div>
+                                    <div class="criteria-detail">
+                                        Progressive stacking shows diminishing returns and identifies which components matter most.
+                                    </div>
+                                </div>
+                                <div class="criteria-card">
+                                    <div class="criteria-header">
+                                        <span class="criteria-icon">⚖️</span>
+                                        <span class="criteria-title">Fair Comparison</span>
+                                    </div>
+                                    <div class="criteria-detail">
+                                        Same 90 questions, same LLM (llama-3.1-8b), 3 runs each with seed=42 for reproducibility.
+                                    </div>
+                                </div>
+                                <div class="criteria-card">
+                                    <div class="criteria-header">
+                                        <span class="criteria-icon">🎓</span>
+                                        <span class="criteria-title">Standard Practice</span>
+                                    </div>
+                                    <div class="criteria-detail">
+                                        Follows established ablation methodology from ICSE/FSE papers on RAG systems.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Statistical Validation -->
+                        <div class="answer-section">
+                            <h4>📐 Statistical Validation</h4>
+                            <div class="stats-validation">
+                                <table class="validation-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Comparison</th>
+                                            <th>Δ Accuracy</th>
+                                            <th>t-statistic</th>
+                                            <th>p-value</th>
+                                            <th>Effect Size (d)</th>
+                                            <th>Significant?</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>Baseline → Hybrid</td>
+                                            <td>+13.1%</td>
+                                            <td>8.42</td>
+                                            <td class="sig">&lt; 0.001</td>
+                                            <td>1.23 (large)</td>
+                                            <td class="yes">✓ Yes</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Hybrid → Graph</td>
+                                            <td>+3.3%</td>
+                                            <td>3.21</td>
+                                            <td class="sig">0.002</td>
+                                            <td>0.48 (medium)</td>
+                                            <td class="yes">✓ Yes</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Graph → Submod</td>
+                                            <td>+1.5%</td>
+                                            <td>2.18</td>
+                                            <td class="sig">0.032</td>
+                                            <td>0.32 (small)</td>
+                                            <td class="yes">✓ Yes</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Submod → Full</td>
+                                            <td>+3.3%</td>
+                                            <td>3.45</td>
+                                            <td class="sig">0.001</td>
+                                            <td>0.51 (medium)</td>
+                                            <td class="yes">✓ Yes</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <div class="validation-note">
+                                    <span class="note-icon">ℹ️</span>
+                                    All comparisons use paired t-test (n=90 questions × 3 runs = 270 samples). Effect size: Cohen's d.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Conclusion Box -->
+                        <div class="conclusion-box">
+                            <div class="conclusion-icon">✅</div>
+                            <div class="conclusion-text">
+                                <strong>Conclusion:</strong> Each variant transition shows statistically significant improvement (p < 0.05), 
+                                validating that all components contribute meaningfully. The largest gain (+13.1%) comes from hybrid retrieval, 
+                                while the full pipeline achieves the highest accuracy (92.4%) with zero hallucinations.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCENE 29: CONCLUSION -->
+        <section class="scene" data-scene="29" data-title="Conclusion">
+            <div class="scene-content title-scene">
+                <div class="chapter-badge conclusion">🎯 Conclusion</div>
+                <h2 class="scene-title animate-in">Thank You!</h2>
+                
+                <div class="conclusion-summary animate-in delay-1">
+                    <div class="summary-stat"><span class="stat-value">92.4%</span><span class="stat-label">Citation Accuracy</span></div>
+                    <div class="summary-stat"><span class="stat-value">0</span><span class="stat-label">Hallucinations</span></div>
+                    <div class="summary-stat"><span class="stat-value">90</span><span class="stat-label">Questions</span></div>
+                    <div class="summary-stat"><span class="stat-value">10</span><span class="stat-label">LLMs Tested</span></div>
+                </div>
+
+                <div class="key-message animate-in delay-2">
+                    <p>Grounded responses aren't just helpful — <strong>they're trustworthy.</strong></p>
+                </div>
+
+                <!-- Author Card - Matching Screenshot Design -->
+                <div class="author-card animate-in delay-3">
+                    <div class="author-avatar">JA</div>
+                    <div class="author-details">
+                        <div class="author-name-card">Jahidul Arafat</div>
+                        <div class="author-cred-row primary">
+                            <span class="cred-icon-sm">🎓</span>
+                            <span>NSF Presidential & Woltosz Graduate Research Fellow</span>
+                        </div>
+                        <div class="author-cred-row secondary">
+                            <span class="cred-icon-sm">🏛️</span>
+                            <span>Graduate Research Fellow, Auburn University</span>
+                        </div>
+                        <div class="author-cred-row former-row">
+                            <span class="former-badge oracle">Former Oracle</span>
+                            <span class="former-role">L3 Senior Solution & Cloud Architect (MLOps)</span>
+                        </div>
+                        <div class="author-cred-row former-row">
+                            <span class="former-badge bkash">Former bKash</span>
+                            <span class="former-role">L4 Principal System Analyst, Reliability Engineering</span>
+                        </div>
+                        <div class="author-sub-note">🦄 Unicorn • Alipay Co-owned • SoftBank Sponsored</div>
+                        <div class="author-email-line">📧 jza0134@auburn.edu</div>
+                    </div>
+                </div>
+
+                <!-- GitHub Link -->
+                <div class="github-section animate-in delay-3">
+                    <a href="https://github.com/jahidul-arafat/codecite" target="_blank" class="github-link-large">
+                        <span class="github-icon-lg">📦</span>
+                        <span class="github-text">
+                            <span class="github-label">Source Code Available</span>
+                            <span class="github-url">github.com/jahidul-arafat/codecite</span>
+                        </span>
+                    </a>
+                </div>
+
+                <div class="bibtex-section animate-in delay-4">
+                    <h4>Citation</h4>
+                    <pre id="bibtexContent">@article{arafat2025codecite,
+  title={Citation-Grounded RAG for Verifiable Code Comprehension},
+  author={Arafat, Jahidul},
+  journal={arXiv preprint},
+  year={2025}
+}</pre>
+                    <button class="copy-btn" onclick="copyBibtex()">📋 Copy BibTeX</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Navigation -->
+    <div class="nav-controls">
+        <button id="prevBtn" class="nav-btn" onclick="prevScene()">← Previous</button>
+        <button id="pauseBtn" class="nav-btn pause" onclick="togglePause()">⏸ Pause</button>
+        <button id="nextBtn" class="nav-btn" onclick="nextScene()">Next →</button>
+    </div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
